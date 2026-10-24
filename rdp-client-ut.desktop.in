@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Windows App RDP
+Comment=Remote Desktop (RDP) client for Ubuntu Touch
+Exec=rdp-client-ut
+Icon=assets/logo.svg
+Terminal=false
+Type=Application
+X-Lomiri-Touch=true
+X-Lomiri-Default-Department-ID=accessories
+Categories=Network;RemoteAccess;

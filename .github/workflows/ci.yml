@@ -1,0 +1,35 @@
+name: CI & Click Package Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  rust-tests:
+    name: Rust Unit & Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Run Cargo Tests
+        run: cargo test --locked
+
+  click-packages:
+    name: Build Ubuntu Touch Click Packages (amd64 & arm64)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Clickable
+        run: pipx install clickable-ut
+      - name: Build Click Package (${{ matrix.arch }})
+        run: clickable build --arch ${{ matrix.arch }} --non-interactive
+      - name: Upload Click Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: click-package-${{ matrix.arch }}
+          path: build/*/app/*.click

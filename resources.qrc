@@ -1,0 +1,23 @@
+<RCC>
+    <qresource prefix="/">
+        <file>assets/logo.svg</file>
+        <file>assets/icons/pc-card.svg</file>
+        <file>assets/icons/trackpad.svg</file>
+        <file>assets/icons/direct-touch.svg</file>
+        <file>assets/icons/keyboard.svg</file>
+        <file>assets/icons/certificate.svg</file>
+        <file>qml/Main.qml</file>
+        <file>qml/theme/Theme.qml</file>
+        <file>qml/pages/DevicesPage.qml</file>
+        <file>qml/pages/PcEditorDialog.qml</file>
+        <file>qml/pages/AccountsPage.qml</file>
+        <file>qml/pages/SettingsPage.qml</file>
+        <file>qml/pages/SessionPage.qml</file>
+        <file>qml/components/PcCard.qml</file>
+        <file>qml/components/RdpViewport.qml</file>
+        <file>qml/components/VirtualTrackpad.qml</file>
+        <file>qml/components/SessionHudPill.qml</file>
+        <file>qml/components/VirtualKeyBar.qml</file>
+        <file>qml/components/CertPromptDialog.qml</file>
+    </qresource>
+</RCC>

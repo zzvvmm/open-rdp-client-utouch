@@ -1,0 +1,58 @@
+[package]
+name = "rdp-client-ut"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.89"
+license = "GPL-3.0-or-later"
+description = "Open-source Remote Desktop (RDP) client for Ubuntu Touch inspired by Windows App"
+authors = ["DD <zzvvmm96@gmail.com>"]
+
+[lib]
+name = "rdp_client_ut"
+path = "src/lib.rs"
+crate-type = ["rlib", "staticlib", "cdylib"]
+
+[[bin]]
+name = "rdp-client-ut-cli"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+base64 = "0.22"
+crc32fast = "1.4"
+dirs = "6.0"
+flate2 = "1.1"
+hex = "0.4"
+ironrdp-cliprdr = "0.7.0"
+ironrdp-connector = "0.10.0"
+ironrdp-core = "0.2.0"
+ironrdp-displaycontrol = "0.8.0"
+ironrdp-dvc = "0.8.0"
+ironrdp-echo = "0.4.0"
+ironrdp-graphics = "0.9.0"
+ironrdp-input = "0.7.0"
+ironrdp-pdu = "0.9.0"
+ironrdp-rdpsnd = "0.9.0"
+ironrdp-session = "0.11.0"
+ironrdp-svc = "0.8.0"
+ironrdp-tls = { version = "0.2.2", default-features = false, features = ["rustls-ring"] }
+ironrdp-tokio = { version = "0.10.0", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+smallvec = "1.15"
+thiserror = "2.0"
+tokio = { version = "1.40", features = ["rt-multi-thread", "net", "io-util", "sync", "time", "macros"] }
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging", "tls12"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2.5"
+uuid = { version = "1.10", features = ["v4", "serde"] }
+x509-cert = { version = "0.2", default-features = false, features = ["std"] }
+
+[dev-dependencies]
+tempfile = "3.12"
+
+[profile.release]
+opt-level = 2
+lto = "thin"

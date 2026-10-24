@@ -1,0 +1,11 @@
+clickable_minimum_required: '8.0'
+builder: cmake
+framework: ubuntu-touch-24.04-1.x
+qt_version: '5.15'
+kill: rdp-client-ut
+make_jobs: 2
+env_vars:
+  CARGO_BUILD_JOBS: '2'
+  CARGO_HOME: ${ROOT}/build/cargo-home
+  RUSTUP_HOME: /opt/rust/rustup
+  PKG_CONFIG_ALLOW_CROSS: '1'
