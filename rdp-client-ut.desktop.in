@@ -1,5 +1,5 @@
 [Desktop Entry]
-Name=Windows App RDP
+Name=Open RDP Client
 Comment=Remote Desktop (RDP) client for Ubuntu Touch
 Exec=rdp-client-ut
 Icon=assets/logo.svg

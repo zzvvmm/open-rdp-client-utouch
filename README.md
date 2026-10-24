@@ -1,6 +1,8 @@
-# Windows App RDP for Ubuntu Touch (`rdp-client-ut`)
+# Open RDP Client for Ubuntu Touch (`rdp-client-ut`)
 
-An open-source (**GPL-3.0-or-later**) Remote Desktop Protocol (RDP) client for **Ubuntu Touch (Lomiri)** powered by a pure-Rust **IronRDP** backend and a **QtQuick / Lomiri UI Toolkit** frontend inspired by Microsoft's **Windows App** (formerly Microsoft Remote Desktop).
+**Open RDP Client** is an open-source (**GPL-3.0-or-later**) Remote Desktop Protocol (RDP) client for **Ubuntu Touch (Lomiri)** powered by a pure-Rust **IronRDP** backend and a **QtQuick / Lomiri UI Toolkit** frontend inspired by Microsoft's **Windows App** (formerly Microsoft Remote Desktop).
+
+The package ID remains `rdp-client-ut.zzvvmm` for compatibility with existing installations and saved data.
 
 ---
 

@@ -63,7 +63,7 @@ Flickable {
                 spacing: units.gu(1.2)
 
                 Label {
-                    text: i18n.tr("Appearance (Windows App / Suru Theme)")
+                    text: i18n.tr("Appearance (Suru Theme)")
                     fontSize: "medium"
                     font.bold: true
                     color: root.darkMode ? "#F3F6FA" : "#1B2028"
@@ -157,13 +157,15 @@ Flickable {
                 spacing: units.gu(0.8)
 
                 Label {
-                    text: i18n.tr("Windows App RDP for Ubuntu Touch")
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    text: i18n.tr("Open RDP Client for Ubuntu Touch")
                     fontSize: "medium"
                     font.bold: true
                     color: root.darkMode ? "#F3F6FA" : "#1B2028"
                 }
                 Label {
-                    text: i18n.tr("Version 0.1.0 • License: GPL-3.0-or-later")
+                    text: i18n.tr("Version 0.1.1 • License: GPL-3.0-or-later")
                     fontSize: "small"
                     color: "#29B6F6"
                 }

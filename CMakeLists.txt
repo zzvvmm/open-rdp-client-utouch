@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(rdp-client-ut VERSION 0.1.0 LANGUAGES CXX)
+project(rdp-client-ut VERSION 0.1.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -41,6 +41,7 @@ add_executable(rdp-client-ut
 
 add_dependencies(rdp-client-ut rust-rdp-backend)
 target_include_directories(rdp-client-ut PRIVATE qt)
+target_link_options(rdp-client-ut PRIVATE -Wl,--gc-sections -Wl,-s)
 target_link_libraries(rdp-client-ut PRIVATE
     ${RUST_STATIC_LIB}
     Qt5::Core

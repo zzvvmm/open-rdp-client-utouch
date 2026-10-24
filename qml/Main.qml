@@ -175,6 +175,8 @@ MainView {
             Row {
                 anchors.left: parent.left
                 anchors.leftMargin: units.gu(2)
+                anchors.right: headerActions.left
+                anchors.rightMargin: units.gu(1.2)
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: units.gu(1.2)
 
@@ -186,14 +188,19 @@ MainView {
                 }
 
                 Column {
+                    width: Math.max(0, parent.width - units.gu(4.8))
                     anchors.verticalCenter: parent.verticalCenter
                     Label {
-                        text: i18n.tr("Windows App")
+                        width: parent.width
+                        elide: Text.ElideRight
+                        text: i18n.tr("Open RDP Client")
                         fontSize: "medium"
                         font.bold: true
                         color: mainView.isDarkMode ? "#F3F6FA" : "#1B2028"
                     }
                     Label {
+                        width: parent.width
+                        elide: Text.ElideRight
                         text: i18n.tr("Ubuntu Touch Remote Desktop")
                         fontSize: "x-small"
                         color: "#29B6F6"
@@ -202,6 +209,7 @@ MainView {
             }
 
             Row {
+                id: headerActions
                 anchors.right: parent.right
                 anchors.rightMargin: units.gu(2)
                 anchors.verticalCenter: parent.verticalCenter

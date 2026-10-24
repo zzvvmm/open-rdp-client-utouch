@@ -1,15 +1,15 @@
 {
     "name": "rdp-client-ut.zzvvmm",
-    "description": "Open-source Remote Desktop (RDP) client for Ubuntu Touch inspired by Windows App, featuring NLA/CredSSP authentication, virtual trackpad & direct touch modes, extended modifier key bar, dynamic display resize, clipboard sync, and audio redirection.",
+    "description": "Open RDP Client is an open-source Remote Desktop (RDP) client for Ubuntu Touch, featuring NLA/CredSSP authentication, virtual trackpad & direct touch modes, extended modifier key bar, dynamic display resize, clipboard sync, and audio redirection.",
     "architecture": "@CLICK_ARCH@",
-    "title": "Windows App RDP",
+    "title": "Open RDP Client",
     "hooks": {
         "rdp-client-ut": {
             "apparmor": "rdp-client-ut.apparmor",
             "desktop": "rdp-client-ut.desktop"
         }
     },
-    "version": "0.1.0",
+    "version": "0.1.1",
     "maintainer": "DD <zzvvmm96@gmail.com>",
     "framework": "@CLICK_FRAMEWORK@"
 }

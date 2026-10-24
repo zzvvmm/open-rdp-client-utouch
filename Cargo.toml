@@ -1,10 +1,10 @@
 [package]
 name = "rdp-client-ut"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.89"
 license = "GPL-3.0-or-later"
-description = "Open-source Remote Desktop (RDP) client for Ubuntu Touch inspired by Windows App"
+description = "Open RDP Client: open-source Remote Desktop (RDP) client for Ubuntu Touch"
 authors = ["DD <zzvvmm96@gmail.com>"]
 
 [lib]
@@ -56,3 +56,4 @@ tempfile = "3.12"
 [profile.release]
 opt-level = 2
 lto = "thin"
+strip = true

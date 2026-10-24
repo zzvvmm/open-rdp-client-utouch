@@ -4,7 +4,7 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: rdp-client-ut.zzvvmm 0.1.0\n"
+"Project-Id-Version: rdp-client-ut.zzvvmm 0.1.1\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-10-24 18:00+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
@@ -15,7 +15,13 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-msgid "Windows App"
+msgid "Open RDP Client"
+msgstr ""
+
+msgid "Open RDP Client for Ubuntu Touch"
+msgstr ""
+
+msgid "Appearance (Suru Theme)"
 msgstr ""
 
 msgid "Ubuntu Touch Remote Desktop"
