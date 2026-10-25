@@ -4,6 +4,9 @@
 
 The package ID remains `rdp-client-ut.zzvvmm` for compatibility with existing installations and saved data.
 
+For the development workflow, version bumps, and releases to GitHub and OpenStore,
+see the [development and release guide](docs/RELEASING.md).
+
 ---
 
 ## Features
