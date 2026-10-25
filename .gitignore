@@ -4,3 +4,4 @@
 *.click
 *.log
 .DS_Store
+.playwright-mcp

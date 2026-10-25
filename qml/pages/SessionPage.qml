@@ -33,7 +33,7 @@ Item {
 
     function restoreKeyboardFocus() {
         Qt.callLater(function() {
-            if (oskInput.enabled) oskInput.forceActiveFocus()
+            oskInput.restoreFocus()
         })
     }
 
@@ -46,7 +46,7 @@ Item {
     onVisibleChanged: {
         if (!visible) {
             releasePointer()
-            Qt.inputMethod.hide()
+            oskInput.hideSoftwareKeyboard()
         } else restoreKeyboardFocus()
     }
     onSessionStageChanged: {
@@ -61,8 +61,10 @@ Item {
     Connections {
         target: Qt.application
         function onStateChanged() {
-            if (Qt.application.state !== Qt.ApplicationActive) root.releasePointer()
-            else root.restoreKeyboardFocus()
+            if (Qt.application.state !== Qt.ApplicationActive) {
+                root.releasePointer()
+                oskInput.hideSoftwareKeyboard()
+            } else root.restoreKeyboardFocus()
         }
     }
 
@@ -161,7 +163,7 @@ Item {
         anchors.fill: viewport
         pcTitle: root.pcTitle
         touchMode: root.touchMode
-        keyboardVisible: Qt.inputMethod.visible
+        keyboardVisible: oskInput.softwareKeyboardRequested
         zoomFactor: viewport.zoomFactor
         currentFps: root.currentFps
         resolutionText: root.remoteWidth + "×" + root.remoteHeight
@@ -176,14 +178,7 @@ Item {
             })
             root.restoreKeyboardFocus()
         }
-        onToggleKeyboard: {
-            if (!Qt.inputMethod.visible) {
-                oskInput.forceActiveFocus()
-                Qt.inputMethod.show()
-            } else {
-                Qt.inputMethod.hide()
-            }
-        }
+        onToggleKeyboard: oskInput.toggleSoftwareKeyboard()
         onCycleZoom: {
             if (viewport.zoomFactor < 1.4) {
                 viewport.zoomFactor = 1.5
@@ -269,10 +264,7 @@ Item {
             })
             root.restoreKeyboardFocus()
         }
-        onSummonOskRequested: {
-            oskInput.forceActiveFocus()
-            Qt.inputMethod.show()
-        }
+        onSummonOskRequested: oskInput.toggleSoftwareKeyboard()
     }
 
     // Connection Progress / Handshake Overlay

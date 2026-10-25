@@ -1,13 +1,65 @@
 import QtQuick 2.12
 
-TextInput {
+FocusScope {
     id: root
     width: 1
     height: 1
     opacity: 0
-    inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
+    property var inputMethod: Qt.inputMethod
+    property bool softwareKeyboardRequested: false
+    property bool keyboardWasVisible: false
 
     signal dispatchAction(var payload)
+
+    function restoreFocus() {
+        if (!enabled || !visible) return
+        if (softwareKeyboardRequested && editorLoader.item) {
+            editorLoader.item.forceActiveFocus()
+        } else {
+            root.forceActiveFocus()
+            if (inputMethod.visible) inputMethod.hide()
+        }
+    }
+
+    function showSoftwareKeyboard() {
+        if (!enabled || !visible) return
+        if (softwareKeyboardRequested) return
+        keyboardWasVisible = false
+        softwareKeyboardRequested = true
+        restoreFocus()
+        inputMethod.show()
+        keyboardWasVisible = inputMethod.visible
+    }
+
+    function hideSoftwareKeyboard() {
+        if (!softwareKeyboardRequested) return
+        softwareKeyboardRequested = false
+        keyboardWasVisible = false
+        inputMethod.hide()
+        restoreFocus()
+    }
+
+    function toggleSoftwareKeyboard() {
+        if (softwareKeyboardRequested) hideSoftwareKeyboard()
+        else showSoftwareKeyboard()
+    }
+
+    function sendText(value) {
+        if (enabled && visible && value.length > 0)
+            root.dispatchAction({ action: "send_qt_key", qtKey: 0, text: value, pressed: true })
+    }
+
+    onEnabledChanged: if (!enabled) hideSoftwareKeyboard()
+    onVisibleChanged: if (!visible) hideSoftwareKeyboard()
+
+    Connections {
+        target: root.inputMethod
+        function onVisibleChanged() {
+            if (!root.softwareKeyboardRequested) return
+            if (root.inputMethod.visible) root.keyboardWasVisible = true
+            else if (root.keyboardWasVisible) root.hideSoftwareKeyboard()
+        }
+    }
 
     function specialKeyName(qtKey) {
         switch (qtKey) {
@@ -57,14 +109,39 @@ TextInput {
         return true
     }
 
-    onTextChanged: {
-        if (text.length > 0) {
-            if (enabled) root.dispatchAction({ action: "send_qt_key", qtKey: 0, text: text, pressed: true })
-            text = ""
+    Loader {
+        id: editorLoader
+        active: root.softwareKeyboardRequested
+        sourceComponent: TextInput {
+            objectName: "remoteTextInput"
+            width: 1
+            height: 1
+            focus: true
+            inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
+
+            onTextChanged: {
+                if (text.length > 0) {
+                    root.sendText(text)
+                    text = ""
+                }
+            }
+
+            Keys.priority: Keys.BeforeItem
+            Keys.onShortcutOverride: event.accepted = !!(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
+            Keys.onPressed: event.accepted = root.handleKey(event.key, event.modifiers)
         }
     }
 
     Keys.priority: Keys.BeforeItem
     Keys.onShortcutOverride: event.accepted = !!(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))
-    Keys.onPressed: event.accepted = root.handleKey(event.key, event.modifiers)
+    Keys.onPressed: {
+        if (root.handleKey(event.key, event.modifiers)) {
+            event.accepted = true
+        } else if (event.text.length > 0) {
+            root.sendText(event.text)
+            event.accepted = true
+        } else {
+            event.accepted = false
+        }
+    }
 }

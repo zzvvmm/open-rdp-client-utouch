@@ -165,7 +165,7 @@ Flickable {
                     color: root.darkMode ? "#F3F6FA" : "#1B2028"
                 }
                 Label {
-                    text: i18n.tr("Version 0.1.2 • License: GPL-3.0-or-later")
+                    text: i18n.tr("Version 0.1.3 • License: GPL-3.0-or-later")
                     fontSize: "small"
                     color: "#29B6F6"
                 }

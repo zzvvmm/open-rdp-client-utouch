@@ -12,7 +12,25 @@ Item {
         height: 300
     }
 
-    Components.RemoteKeyboard { id: keyboard }
+    QtObject {
+        id: mockInputMethod
+        property bool visible: false
+        property int showCount: 0
+        property int hideCount: 0
+        function show() {
+            showCount++
+            visible = true
+        }
+        function hide() {
+            hideCount++
+            visible = false
+        }
+    }
+
+    Components.RemoteKeyboard {
+        id: keyboard
+        inputMethod: mockInputMethod
+    }
 
     Components.PointerControls {
         id: controls
@@ -51,7 +69,11 @@ Item {
             pad.canvasW = 400
             pad.canvasH = 300
             controls.dragLocked = false
-            keyboard.forceActiveFocus()
+            keyboard.hideSoftwareKeyboard()
+            mockInputMethod.visible = false
+            mockInputMethod.showCount = 0
+            mockInputMethod.hideCount = 0
+            keyboard.restoreFocus()
             clicks.clear()
             buttons.clear()
             movement.clear()
@@ -230,11 +252,41 @@ Item {
         }
 
         function test_keyboard_text_is_committed_once() {
-            keyboard.text = "hello world"
+            keyboard.showSoftwareKeyboard()
+            var input = findChild(keyboard, "remoteTextInput")
+            verify(input !== null)
+            input.text = "hello world"
             compare(keys.count, 1)
             compare(keys.signalArguments[0][0].qtKey, 0)
             compare(keys.signalArguments[0][0].text, "hello world")
-            compare(keyboard.text, "")
+            compare(input.text, "")
+        }
+
+        function test_software_keyboard_lifecycle_and_focus_restoration() {
+            verify(!keyboard.softwareKeyboardRequested)
+            compare(mockInputMethod.showCount, 0)
+            keyboard.restoreFocus()
+            compare(mockInputMethod.showCount, 0)
+            verify(!keyboard.softwareKeyboardRequested)
+
+            keyClick(Qt.Key_A)
+            compare(keys.count, 1)
+            compare(keys.signalArguments[0][0].text, "a")
+            compare(mockInputMethod.showCount, 0)
+
+            keyboard.toggleSoftwareKeyboard()
+            verify(keyboard.softwareKeyboardRequested)
+            compare(mockInputMethod.showCount, 1)
+
+            keyboard.restoreFocus()
+            compare(mockInputMethod.showCount, 1)
+
+            mockInputMethod.hide()
+            verify(!keyboard.softwareKeyboardRequested)
+
+            keyboard.restoreFocus()
+            compare(mockInputMethod.showCount, 1)
+            verify(!keyboard.softwareKeyboardRequested)
         }
 
         function test_explicit_mouse_controls() {

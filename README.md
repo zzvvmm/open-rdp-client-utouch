@@ -40,7 +40,8 @@ These controls work with Windows and Linux desktops, including Ubuntu/XFCE:
 - **Move windows or select text:** Position the pointer on the title bar or selection start, tap **Drag**, and swipe as many times as needed. Tap **Release** to drop. The held button is also released when leaving the session or switching input modes.
 - **Direct touch:** Tap the target to click, drag a finger to move a window or select text, and hold still to open its context menu. Touches in the black border are ignored.
 - **Zoom:** Use the floating session menu to switch between 100%, 150%, and 200%. In trackpad mode, move the pointer towards an edge to reveal that part of the desktop. Use 100% to return to the full desktop.
-- **Typing and shortcuts:** The keyboard button opens or hides the on-screen keyboard without hiding the extra key bar. The **Shortcuts** menu includes Copy/Paste/Select all, `Ctrl+Alt+T`, `Alt+F2`, `Alt+F4`, `Ctrl+Alt+D`, and terminal-friendly `Ctrl+Shift+C` / `Ctrl+Shift+V`. Their effects depend on the remote desktop's configured key bindings. The same combinations can be sent from a hardware keyboard when delivered to the app.
+- **On-screen keyboard:** Hidden by default. Tap either keyboard button to open or hide it without hiding the extra key bar. After dismissing it, pointer actions and shortcuts do not reopen it. Leaving the session or backgrounding the app also hides it; returning does not reopen it automatically.
+- **Typing and shortcuts:** A hardware keyboard works without opening the on-screen keyboard. The **Shortcuts** menu includes Copy/Paste/Select all, `Ctrl+Alt+T`, `Alt+F2`, `Alt+F4`, `Ctrl+Alt+D`, and terminal-friendly `Ctrl+Shift+C` / `Ctrl+Shift+V`. Their effects depend on the remote desktop's configured key bindings. The same combinations can be sent from a hardware keyboard when delivered to the app.
 
 ---
 
