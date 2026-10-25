@@ -19,6 +19,8 @@ jobs:
   click-packages:
     name: Build Ubuntu Touch Click Packages (amd64 & arm64)
     runs-on: ubuntu-latest
+    env:
+      CLICKABLE_DOCKER_COMMAND: docker
     strategy:
       matrix:
         arch: [amd64, arm64]
@@ -28,6 +30,9 @@ jobs:
         run: pipx install clickable-ut
       - name: Build Click Package (${{ matrix.arch }})
         run: clickable build --arch ${{ matrix.arch }} --non-interactive
+      - name: Run QML Interaction Tests
+        if: matrix.arch == 'amd64'
+        run: clickable test --arch amd64 --non-interactive
       - name: Upload Click Artifact
         uses: actions/upload-artifact@v4
         with:

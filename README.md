@@ -21,11 +21,26 @@ The package ID remains `rdp-client-ut.zzvvmm` for compatibility with existing in
   - **Audio Output Redirection (`RDPSND`)**: Streams 44.1 kHz / 48 kHz 16-bit stereo PCM audio from the remote PC to Ubuntu Touch via `QtMultimedia`.
 - **Touchscreen Ergonomics Built for Mobile (`VirtualTrackpad.qml` & `VirtualKeyBar.qml`)**
   - **Mouse Pointer (Virtual Trackpad) Mode**: Relative trackpad movement with configurable speed, 1-finger tap left-click, double-tap, long-press drag selection, 2-finger tap right-click, and 2-finger scroll wheel.
-  - **Direct Touch Mode**: Tap directly at remote coordinates; press-and-hold triggers right-click with a visual indicator.
-  - **Pinch-to-Zoom & Pan (`RdpViewport.qml`)**: Quick `100%` / `150%` / `200%` zoom and pan.
+  - **Direct Touch Mode**: Tap directly at remote coordinates, drag to move windows or select text, and press-and-hold to right-click with a visual indicator.
+  - **Explicit Mouse Controls**: Dedicated left-click, right-click, double-click, drag lock, and precision pointer controls. Gesture cancellation releases held buttons.
+  - **Zoom & Cursor-Following Pan (`RdpViewport.qml`)**: Quick `100%` / `150%` / `200%` zoom; in trackpad mode the viewport follows the pointer without stealing remote drag gestures.
+  - **Hardware Mouse & Keyboard**: Absolute mouse positioning, all three mouse buttons, dragging, wheel input, and hardware keyboard shortcuts. Navigation keys are sent with matching releases.
   - **3-State Sticky Modifier & Function Key Bar (`VirtualKeyBar.qml`)**: `Ctrl`, `Alt`, `Shift`, and `Win` support `Off` → `Latched (•)` → `Locked (••)`, alongside `Esc`, `Tab`, arrow keys, `Home`/`End`/`PgUp`/`PgDn`, `F1`–`F12`, and one-tap shortcuts (`Ctrl+Alt+Del`, `Alt+Tab`, `Win+D`, `Win+L`, `Ctrl+Shift+Esc`).
 - **Encrypted Local Credential Vault (`src/storage/credentials.rs`)**
   - Reusable User Accounts (`AccountsPage.qml`) with passwords sealed in `$XDG_DATA_HOME/rdp-client-ut.zzvvmm/vault.json`.
+
+---
+
+## Remote Desktop Controls
+
+These controls work with Windows and Linux desktops, including Ubuntu/XFCE:
+
+- **Trackpad:** Swipe one finger to move the pointer; tap to click; tap twice to double-click. Hold one finger still, then move it to drag, and lift to release. Tap with two fingers to right-click, or move two fingers to scroll.
+- **Small targets:** Enable **Precise** for 35% pointer movement, then use **Left**, **Right**, or **Double** to click without disturbing the pointer.
+- **Move windows or select text:** Position the pointer on the title bar or selection start, tap **Drag**, and swipe as many times as needed. Tap **Release** to drop. The held button is also released when leaving the session or switching input modes.
+- **Direct touch:** Tap the target to click, drag a finger to move a window or select text, and hold still to open its context menu. Touches in the black border are ignored.
+- **Zoom:** Use the floating session menu to switch between 100%, 150%, and 200%. In trackpad mode, move the pointer towards an edge to reveal that part of the desktop. Use 100% to return to the full desktop.
+- **Typing and shortcuts:** The keyboard button opens or hides the on-screen keyboard without hiding the extra key bar. The **Shortcuts** menu includes Copy/Paste/Select all, `Ctrl+Alt+T`, `Alt+F2`, `Alt+F4`, `Ctrl+Alt+D`, and terminal-friendly `Ctrl+Shift+C` / `Ctrl+Shift+V`. Their effects depend on the remote desktop's configured key bindings. The same combinations can be sent from a hardware keyboard when delivered to the app.
 
 ---
 
@@ -71,6 +86,14 @@ clickable build --arch amd64
 # Build for ARM64 (Ubuntu Touch phones & tablets)
 clickable build --arch arm64
 ```
+
+After an amd64 build, run the touch, mouse, and keyboard regression tests:
+
+```bash
+clickable test --arch amd64
+```
+
+The amd64 CI build runs these QML tests automatically.
 
 ### 3. Install & Launch on an Ubuntu Touch Device over ADB
 ```bash

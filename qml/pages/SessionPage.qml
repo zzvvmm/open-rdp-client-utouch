@@ -21,12 +21,49 @@ Item {
     property string winState: "off"
     property var pendingCert: null
     property bool keyBarVisible: true
+    property bool dragLocked: false
+    property bool precisionMode: false
 
     signal dispatchAction(var payload)
     signal exitSessionView()
 
     function notifyFrameUpdated() {
         viewport.refreshCanvas()
+    }
+
+    function restoreKeyboardFocus() {
+        Qt.callLater(function() {
+            if (oskInput.enabled) oskInput.forceActiveFocus()
+        })
+    }
+
+    function releasePointer() {
+        if (dragLocked) root.dispatchAction({ action: "mouse_button", button: 1, pressed: false })
+        dragLocked = false
+        if (viewport) viewport.cancelInput()
+    }
+
+    onVisibleChanged: {
+        if (!visible) {
+            releasePointer()
+            Qt.inputMethod.hide()
+        } else restoreKeyboardFocus()
+    }
+    onSessionStageChanged: {
+        if (sessionStage !== "connected") releasePointer()
+        else restoreKeyboardFocus()
+    }
+    onPendingCertChanged: {
+        if (pendingCert !== null) releasePointer()
+        else restoreKeyboardFocus()
+    }
+
+    Connections {
+        target: Qt.application
+        function onStateChanged() {
+            if (Qt.application.state !== Qt.ApplicationActive) root.releasePointer()
+            else root.restoreKeyboardFocus()
+        }
     }
 
     // Dynamic Display Resize (DISP DVC) debounce when phone rotates or Convergence window resizes
@@ -50,49 +87,11 @@ Item {
     onHeightChanged: resizeDebounce.restart()
 
     // Hidden input to summon Lomiri OSK and capture hardware/OSK keyboard input
-    TextInput {
+    RemoteKeyboard {
         id: oskInput
-        width: 1
-        height: 1
-        opacity: 0
-        focus: root.visible && root.pendingCert === null
-        inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
-
-        onTextChanged: {
-            if (text.length > 0) {
-                root.dispatchAction({
-                    action: "send_qt_key",
-                    qtKey: 0,
-                    text: text,
-                    pressed: true
-                })
-                text = ""
-            }
-        }
-
-        Keys.onPressed: {
-            if (event.key === Qt.Key_Backspace) {
-                root.dispatchAction({ action: "send_virtual_key", key: "Bksp" })
-                event.accepted = true
-            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                root.dispatchAction({ action: "send_virtual_key", key: "Enter" })
-                event.accepted = true
-            } else if (event.key === Qt.Key_Escape) {
-                root.dispatchAction({ action: "send_virtual_key", key: "Esc" })
-                event.accepted = true
-            } else if (event.key === Qt.Key_Tab) {
-                root.dispatchAction({ action: "send_virtual_key", key: "Tab" })
-                event.accepted = true
-            } else if (event.key >= Qt.Key_Home && event.key <= Qt.Key_PageDown) {
-                root.dispatchAction({
-                    action: "send_qt_key",
-                    qtKey: event.key,
-                    text: "",
-                    pressed: true
-                })
-                event.accepted = true
-            }
-        }
+        enabled: root.visible && root.sessionStage === "connected" && root.pendingCert === null
+        focus: enabled
+        onDispatchAction: root.dispatchAction(payload)
     }
 
     // Remote Desktop Canvas Viewport
@@ -101,15 +100,19 @@ Item {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: vKeyBar.visible ? vKeyBar.top : parent.bottom
+        anchors.bottom: pointerControls.top
+        enabled: root.visible && root.sessionStage === "connected" && root.pendingCert === null
 
         touchMode: root.touchMode
         remoteWidth: root.remoteWidth
         remoteHeight: root.remoteHeight
         cursorX: root.cursorX
         cursorY: root.cursorY
+        movementScale: root.precisionMode ? 0.35 : 1.0
+        dragLocked: root.dragLocked
 
         onRelativeMove: {
+            if (!oskInput.activeFocus) root.restoreKeyboardFocus()
             root.dispatchAction({
                 action: "trackpad_move",
                 dx: dx,
@@ -117,6 +120,7 @@ Item {
             })
         }
         onAbsoluteMove: {
+            if (!oskInput.activeFocus) root.restoreKeyboardFocus()
             root.dispatchAction({
                 action: "pointer_move_abs",
                 x: rx,
@@ -124,6 +128,7 @@ Item {
             })
         }
         onMouseClick: {
+            root.restoreKeyboardFocus()
             root.dispatchAction({
                 action: "mouse_click",
                 button: button,
@@ -133,6 +138,7 @@ Item {
             })
         }
         onMouseButton: {
+            root.restoreKeyboardFocus()
             root.dispatchAction({
                 action: "mouse_button",
                 button: button,
@@ -155,22 +161,23 @@ Item {
         anchors.fill: viewport
         pcTitle: root.pcTitle
         touchMode: root.touchMode
-        keyboardVisible: root.keyBarVisible
+        keyboardVisible: Qt.inputMethod.visible
         zoomFactor: viewport.zoomFactor
         currentFps: root.currentFps
         resolutionText: root.remoteWidth + "×" + root.remoteHeight
         showStats: root.showStats
 
         onToggleTouchMode: {
+            root.releasePointer()
             var nextMode = root.touchMode === "mouse_pointer" ? "direct_touch" : "mouse_pointer"
             root.dispatchAction({
                 action: "set_touch_mode",
                 mode: nextMode
             })
+            root.restoreKeyboardFocus()
         }
         onToggleKeyboard: {
-            root.keyBarVisible = !root.keyBarVisible
-            if (root.keyBarVisible) {
+            if (!Qt.inputMethod.visible) {
                 oskInput.forceActiveFocus()
                 Qt.inputMethod.show()
             } else {
@@ -185,16 +192,46 @@ Item {
             } else {
                 viewport.resetZoom()
             }
+            root.restoreKeyboardFocus()
         }
         onSendChordRequested: {
             root.dispatchAction({
                 action: "send_chord",
                 chord: chord
             })
+            root.restoreKeyboardFocus()
         }
         onDisconnectRequested: {
+            root.releasePointer()
             root.dispatchAction({ action: "disconnect_session" })
             root.exitSessionView()
+        }
+    }
+
+    PointerControls {
+        id: pointerControls
+        visible: root.sessionStage === "connected" && root.pendingCert === null
+        height: visible ? units.gu(5.6) : 0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: vKeyBar.visible ? vKeyBar.top : parent.bottom
+        dragLocked: root.dragLocked
+        precisionMode: root.precisionMode
+
+        onClickRequested: {
+            root.releasePointer()
+            root.dispatchAction({ action: "mouse_click", button: button, doubleClick: doubleClick })
+            root.restoreKeyboardFocus()
+        }
+        onToggleDragRequested: {
+            viewport.cancelInput()
+            root.dragLocked = !root.dragLocked
+            root.dispatchAction({ action: "mouse_button", button: 1, pressed: root.dragLocked })
+            root.restoreKeyboardFocus()
+        }
+        onTogglePrecisionRequested: {
+            root.precisionMode = !root.precisionMode
+            root.restoreKeyboardFocus()
         }
     }
 
@@ -216,18 +253,21 @@ Item {
                 action: "toggle_modifier",
                 modifier: modifierName
             })
+            root.restoreKeyboardFocus()
         }
         onVirtualKeyTapped: {
             root.dispatchAction({
                 action: "send_virtual_key",
                 key: keyName
             })
+            root.restoreKeyboardFocus()
         }
         onChordTapped: {
             root.dispatchAction({
                 action: "send_chord",
                 chord: chordName
             })
+            root.restoreKeyboardFocus()
         }
         onSummonOskRequested: {
             oskInput.forceActiveFocus()

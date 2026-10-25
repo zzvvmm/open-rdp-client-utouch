@@ -16,6 +16,8 @@
         <file>qml/components/PcCard.qml</file>
         <file>qml/components/RdpViewport.qml</file>
         <file>qml/components/VirtualTrackpad.qml</file>
+        <file>qml/components/RemoteKeyboard.qml</file>
+        <file>qml/components/PointerControls.qml</file>
         <file>qml/components/SessionHudPill.qml</file>
         <file>qml/components/VirtualKeyBar.qml</file>
         <file>qml/components/CertPromptDialog.qml</file>

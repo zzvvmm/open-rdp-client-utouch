@@ -11,6 +11,8 @@ Item {
     property int cursorX: 640
     property int cursorY: 360
     property real zoomFactor: 1.0
+    property real movementScale: 1.0
+    property bool dragLocked: false
 
     signal relativeMove(real dx, real dy)
     signal absoluteMove(int rx, int ry)
@@ -28,6 +30,41 @@ Item {
         viewportFlickable.contentY = 0
     }
 
+    function cancelInput() {
+        trackpad.cancelInput()
+    }
+
+    function followCursor() {
+        if (!viewportFlickable || !rdpCanvas) return
+        if (zoomFactor <= 1.01) {
+            viewportFlickable.contentX = 0
+            viewportFlickable.contentY = 0
+            return
+        }
+        if (touchMode !== "mouse_pointer") return
+        var pointerX = rdpCanvas.x + cursorX / Math.max(1, remoteWidth - 1) * rdpCanvas.width
+        var pointerY = rdpCanvas.y + cursorY / Math.max(1, remoteHeight - 1) * rdpCanvas.height
+        var marginX = Math.min(units.gu(6), width / 4)
+        var marginY = Math.min(units.gu(6), height / 4)
+        var offsetX = viewportFlickable.contentX
+        var offsetY = viewportFlickable.contentY
+        if (pointerX < offsetX + marginX) offsetX = pointerX - marginX
+        else if (pointerX > offsetX + width - marginX) offsetX = pointerX - width + marginX
+        if (pointerY < offsetY + marginY) offsetY = pointerY - marginY
+        else if (pointerY > offsetY + height - marginY) offsetY = pointerY - height + marginY
+        viewportFlickable.contentX = Math.max(0, Math.min(viewportFlickable.contentWidth - width, offsetX))
+        viewportFlickable.contentY = Math.max(0, Math.min(viewportFlickable.contentHeight - height, offsetY))
+    }
+
+    onCursorXChanged: followCursor()
+    onCursorYChanged: followCursor()
+    onZoomFactorChanged: Qt.callLater(followCursor)
+    onWidthChanged: Qt.callLater(followCursor)
+    onHeightChanged: Qt.callLater(followCursor)
+    onRemoteWidthChanged: Qt.callLater(followCursor)
+    onRemoteHeightChanged: Qt.callLater(followCursor)
+    onTouchModeChanged: Qt.callLater(followCursor)
+
     Rectangle {
         anchors.fill: parent
         color: "#0A0D12"
@@ -38,7 +75,7 @@ Item {
         anchors.fill: parent
         contentWidth: Math.max(width, width * root.zoomFactor)
         contentHeight: Math.max(height, height * root.zoomFactor)
-        interactive: root.zoomFactor > 1.01
+        interactive: false
         boundsBehavior: Flickable.StopAtBounds
         clip: true
 
@@ -60,6 +97,7 @@ Item {
             }
 
             VirtualTrackpad {
+                id: trackpad
                 anchors.fill: parent
                 touchMode: root.touchMode
                 remoteWidth: root.remoteWidth
@@ -70,6 +108,8 @@ Item {
                 canvasY: rdpCanvas.y
                 canvasW: rdpCanvas.width
                 canvasH: rdpCanvas.height
+                movementScale: root.movementScale
+                dragLocked: root.dragLocked
 
                 onRelativeMove: root.relativeMove(dx, dy)
                 onAbsoluteMove: root.absoluteMove(rx, ry)

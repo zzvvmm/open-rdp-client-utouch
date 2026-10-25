@@ -287,33 +287,45 @@ impl InputMapper {
 
     /// Sends a special chord such as `"ctrl+alt+del"`, `"alt+tab"`, `"win+d"`, `"win+l"`.
     pub fn send_chord(&mut self, chord_name: &str) -> Vec<FastPathInputEvent> {
-        self.consume_latched_modifiers();
-        match chord_name.to_ascii_lowercase().as_str() {
-            "ctrl+alt+del" | "cad" => chord_events(&[
-                (0x1D, false), // Left Ctrl
-                (0x38, false), // Left Alt
-                (0x53, true),  // Delete (Extended)
-            ]),
-            "alt+tab" => chord_events(&[
-                (0x38, false), // Left Alt
-                (0x0F, false), // Tab
-            ]),
-            "win" | "start" => chord_events(&[(0x5B, true)]),
-            "win+d" | "show_desktop" => chord_events(&[
-                (0x5B, true),  // Left Win
-                (0x20, false), // D
-            ]),
-            "win+l" | "lock_pc" => chord_events(&[
-                (0x5B, true),  // Left Win
-                (0x26, false), // L
-            ]),
-            "ctrl+shift+esc" | "task_manager" => chord_events(&[
-                (0x1D, false), // Left Ctrl
-                (0x2A, false), // Left Shift
-                (0x01, false), // Esc
-            ]),
-            _ => Vec::new(),
+        let normalized = chord_name.trim().to_ascii_lowercase();
+        let canonical = match normalized.as_str() {
+            "cad" => "ctrl+alt+del",
+            "start" => "win",
+            "show_desktop" => "win+d",
+            "lock_pc" => "win+l",
+            "task_manager" => "ctrl+shift+esc",
+            other => other,
+        };
+        let mut parts: Vec<_> = canonical.split('+').map(str::trim).collect();
+        let Some(key_name) = parts.pop() else {
+            return Vec::new();
+        };
+        let primary = virtual_key_to_scancode(key_name).or_else(|| {
+            if key_name.chars().count() == 1 {
+                ascii_to_scancode(key_name.chars().next()?).map(|(scancode, _)| (scancode, false))
+            } else {
+                None
+            }
+        });
+        let Some(primary) = primary else {
+            return Vec::new();
+        };
+        let mut keys = Vec::with_capacity(5);
+        for modifier in parts {
+            let key = match modifier {
+                "ctrl" | "control" => (0x1D, false),
+                "alt" => (0x38, false),
+                "shift" => (0x2A, false),
+                "win" | "meta" | "super" => (0x5B, true),
+                _ => return Vec::new(),
+            };
+            if !keys.contains(&key) {
+                keys.push(key);
+            }
         }
+        keys.push(primary);
+        self.consume_latched_modifiers();
+        chord_events(&keys)
     }
 
     fn send_text_char(&mut self, ch: char) -> Vec<FastPathInputEvent> {
@@ -618,5 +630,57 @@ mod tests {
         let mut mapper = InputMapper::new(1280, 720);
         let cad = mapper.send_chord("ctrl+alt+del");
         assert_eq!(cad.len(), 6);
+    }
+
+    #[test]
+    fn test_linux_and_editing_shortcuts_release_every_key() {
+        let mut mapper = InputMapper::new(1280, 720);
+        for (chord, scancodes) in [
+            ("ctrl+c", vec![0x1D, 0x2E]),
+            ("ctrl+v", vec![0x1D, 0x2F]),
+            ("ctrl+a", vec![0x1D, 0x1E]),
+            ("ctrl+alt+t", vec![0x1D, 0x38, 0x14]),
+            ("alt+f2", vec![0x38, 0x3C]),
+            ("alt+f4", vec![0x38, 0x3E]),
+            ("ctrl+shift+c", vec![0x1D, 0x2A, 0x2E]),
+            ("ctrl+shift+v", vec![0x1D, 0x2A, 0x2F]),
+            ("ctrl+alt+d", vec![0x1D, 0x38, 0x20]),
+        ] {
+            let events = mapper.send_chord(chord);
+            assert_eq!(events.len(), scancodes.len() * 2, "{chord}");
+            for (event, expected) in events.iter().take(scancodes.len()).zip(&scancodes) {
+                assert!(matches!(event, FastPathInputEvent::KeyboardEvent(flags, key)
+                    if *flags == KeyboardFlags::empty() && key == expected), "{chord}");
+            }
+            for (event, expected) in events.iter().skip(scancodes.len()).zip(scancodes.iter().rev()) {
+                assert!(matches!(event, FastPathInputEvent::KeyboardEvent(flags, key)
+                    if *flags == KeyboardFlags::RELEASE && key == expected), "{chord}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_shortcut_validation_preserves_latched_modifiers() {
+        let mut mapper = InputMapper::default();
+        mapper.toggle_sticky_modifier("ctrl");
+        for invalid in ["", "ctrl+", "bogus+c", "ctrl+unknown", "ctrl++c"] {
+            assert!(mapper.send_chord(invalid).is_empty());
+            assert_eq!(mapper.ctrl, StickyState::Latched);
+        }
+        assert_eq!(mapper.send_chord(" CTRL + ctrl + C ").len(), 4);
+        assert_eq!(mapper.ctrl, StickyState::Off);
+    }
+
+    #[test]
+    fn test_navigation_keys_have_balanced_extended_events() {
+        let mut mapper = InputMapper::default();
+        for key_name in ["Left", "Right", "Up", "Down", "Home", "End", "PgUp", "PgDn", "Del"] {
+            let events = mapper.send_virtual_key(key_name);
+            assert_eq!(events.len(), 2);
+            assert!(matches!(events[0], FastPathInputEvent::KeyboardEvent(flags, _)
+                if flags == KeyboardFlags::EXTENDED));
+            assert!(matches!(events[1], FastPathInputEvent::KeyboardEvent(flags, _)
+                if flags == KeyboardFlags::EXTENDED | KeyboardFlags::RELEASE));
+        }
     }
 }

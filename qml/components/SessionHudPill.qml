@@ -92,22 +92,34 @@ Item {
     // Expanded Windows App In-Session Control Bar
     Rectangle {
         id: expandedDrawer
+        objectName: "sessionDrawer"
         visible: root.expanded
-        anchors.top: floatingPill.bottom
-        anchors.topMargin: units.gu(0.8)
+        y: Math.max(units.gu(0.5), Math.min(floatingPill.y + floatingPill.height + units.gu(0.8),
+                                          root.height - height - units.gu(0.5)))
         anchors.horizontalCenter: parent.horizontalCenter
         width: Math.min(parent.width - units.gu(2), units.gu(56))
-        height: drawerCol.implicitHeight + units.gu(2.4)
+        height: Math.min(drawerCol.implicitHeight + units.gu(2.4), Math.max(0, root.height - units.gu(1)))
         radius: units.gu(1.5)
         color: "#EE161C26"
         border.width: units.dp(1)
         border.color: "#2B3548"
         z: 45
 
+        Flickable {
+            id: drawerScroll
+            objectName: "sessionDrawerScroll"
+            anchors.fill: parent
+            anchors.margins: units.gu(1.2)
+            contentWidth: width
+            contentHeight: drawerCol.implicitHeight
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+        }
+
         Column {
             id: drawerCol
-            anchors.centerIn: parent
-            width: parent.width - units.gu(2.4)
+            parent: drawerScroll.contentItem
+            width: drawerScroll.width
             spacing: units.gu(1.2)
 
             Row {
@@ -166,7 +178,7 @@ Item {
                             }
                             Label {
                                 anchors.horizontalCenter: parent.horizontalCenter
-                                text: i18n.tr("Keys")
+                                text: i18n.tr("Keyboard")
                                 fontSize: "x-small"
                                 color: "#FFFFFF"
                             }
@@ -273,12 +285,21 @@ Item {
 
                 Repeater {
                     model: [
+                        { label: i18n.tr("Copy"), chord: "ctrl+c" },
+                        { label: i18n.tr("Paste"), chord: "ctrl+v" },
+                        { label: i18n.tr("Select all"), chord: "ctrl+a" },
+                        { label: "Ctrl+Alt+T", chord: "ctrl+alt+t" },
+                        { label: "Alt+F2", chord: "alt+f2" },
+                        { label: "Alt+F4", chord: "alt+f4" },
+                        { label: "Ctrl+Shift+C", chord: "ctrl+shift+c" },
+                        { label: "Ctrl+Shift+V", chord: "ctrl+shift+v" },
+                        { label: "Ctrl+Alt+D", chord: "ctrl+alt+d" },
                         { label: "Ctrl+Alt+Del", chord: "ctrl+alt+del" },
                         { label: "Alt+Tab", chord: "alt+tab" },
-                        { label: "Start (Win)", chord: "win" },
-                        { label: "Desktop (Win+D)", chord: "win+d" },
-                        { label: "Task Mgr", chord: "ctrl+shift+esc" },
-                        { label: "Lock PC (Win+L)", chord: "win+l" }
+                        { label: i18n.tr("Super / Win"), chord: "win" },
+                        { label: "Win+D", chord: "win+d" },
+                        { label: "Ctrl+Shift+Esc", chord: "ctrl+shift+esc" },
+                        { label: "Win+L", chord: "win+l" }
                     ]
                     delegate: Button {
                         width: (drawerCol.width - units.gu(1.6)) / 3

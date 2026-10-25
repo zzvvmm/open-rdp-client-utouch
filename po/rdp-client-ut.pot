@@ -4,7 +4,7 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: rdp-client-ut.zzvvmm 0.1.1\n"
+"Project-Id-Version: rdp-client-ut.zzvvmm 0.1.2\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2026-10-24 18:00+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
@@ -40,4 +40,37 @@ msgid "Accounts & Certs"
 msgstr ""
 
 msgid "Settings"
+msgstr ""
+
+msgid "Left"
+msgstr ""
+
+msgid "Right"
+msgstr ""
+
+msgid "Double"
+msgstr ""
+
+msgid "Drag"
+msgstr ""
+
+msgid "Release"
+msgstr ""
+
+msgid "Precise"
+msgstr ""
+
+msgid "Keyboard"
+msgstr ""
+
+msgid "Copy"
+msgstr ""
+
+msgid "Paste"
+msgstr ""
+
+msgid "Select all"
+msgstr ""
+
+msgid "Super / Win"
 msgstr ""

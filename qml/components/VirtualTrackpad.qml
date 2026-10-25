@@ -13,6 +13,20 @@ Item {
     property real canvasY: 0
     property real canvasW: width
     property real canvasH: height
+    property real movementScale: 1.0
+    property bool dragLocked: false
+    property int gestureState: 0
+    property bool dragSelecting: false
+    property bool holdTriggered: false
+    property bool singleFingerMoved: false
+    property bool twoFingerMoved: false
+    property real startX: 0
+    property real startY: 0
+    property real lastX: 0
+    property real lastY: 0
+    property real scrollRemainderX: 0
+    property real scrollRemainderY: 0
+    property double pressTimestamp: 0
 
     signal relativeMove(real dx, real dy)
     signal absoluteMove(int rx, int ry)
@@ -34,12 +48,145 @@ Item {
         return Math.round(norm * (remoteHeight - 1))
     }
 
+    function insideCanvas(localX, localY) {
+        return localX >= canvasX && localX <= canvasX + canvasW
+                && localY >= canvasY && localY <= canvasY + canvasH
+    }
+
+    function releaseTouchButton() {
+        if (dragSelecting) root.mouseButton(1, false, -1, -1)
+        dragSelecting = false
+    }
+
+    function cancelTouch() {
+        longPressTimer.stop()
+        releaseTouchButton()
+        gestureState = 0
+        holdRing.visible = false
+    }
+
+    function cancelInput() {
+        cancelTouch()
+        if (desktopMouse) desktopMouse.releaseButtons()
+    }
+
+    function beginSingle(localX, localY) {
+        cancelTouch()
+        if (touchMode === "direct_touch" && !insideCanvas(localX, localY)) return
+        gestureState = 1
+        startX = lastX = localX
+        startY = lastY = localY
+        pressTimestamp = Date.now()
+        holdTriggered = false
+        singleFingerMoved = false
+        longPressTimer.restart()
+    }
+
+    function beginTwo(localX, localY) {
+        if (touchMode === "direct_touch" && !insideCanvas(localX, localY)) {
+            cancelTouch()
+            gestureState = 3
+            return
+        }
+        longPressTimer.stop()
+        releaseTouchButton()
+        holdRing.visible = false
+        gestureState = 2
+        twoFingerMoved = false
+        startX = lastX = localX
+        startY = lastY = localY
+        scrollRemainderX = scrollRemainderY = 0
+        pressTimestamp = Date.now()
+        if (touchMode === "direct_touch" && insideCanvas(localX, localY))
+            absoluteMove(toRemoteX(localX), toRemoteY(localY))
+    }
+
+    function updateSingle(localX, localY) {
+        if (gestureState !== 1) return
+        var deltaX = localX - lastX
+        var deltaY = localY - lastY
+        lastX = localX
+        lastY = localY
+        var moved = Math.hypot(localX - startX, localY - startY) > units.gu(1.2)
+        if (moved) {
+            singleFingerMoved = true
+            longPressTimer.stop()
+            if (touchMode === "direct_touch" && !holdTriggered && !dragSelecting && !dragLocked) {
+                dragSelecting = true
+                mouseButton(1, true, toRemoteX(startX), toRemoteY(startY))
+            }
+        }
+        if (touchMode === "mouse_pointer") {
+            relativeMove(deltaX * remoteWidth / Math.max(1, canvasW) * movementScale,
+                         deltaY * remoteHeight / Math.max(1, canvasH) * movementScale)
+        } else if (!holdTriggered) {
+            absoluteMove(toRemoteX(localX), toRemoteY(localY))
+        }
+    }
+
+    function updateTwo(localX, localY) {
+        if (gestureState !== 2) return
+        if (!twoFingerMoved && Math.hypot(localX - startX, localY - startY) < units.gu(0.6)) return
+        twoFingerMoved = true
+        var vertical = (localY - lastY) * 3 + scrollRemainderY
+        var horizontal = (lastX - localX) * 3 + scrollRemainderX
+        var verticalUnits = Math.round(vertical)
+        var horizontalUnits = Math.round(horizontal)
+        scrollRemainderY = vertical - verticalUnits
+        scrollRemainderX = horizontal - horizontalUnits
+        lastX = localX
+        lastY = localY
+        if (verticalUnits || horizontalUnits) mouseScroll(verticalUnits, horizontalUnits)
+    }
+
+    function finishTouch() {
+        longPressTimer.stop()
+        holdRing.visible = false
+        var elapsed = Date.now() - pressTimestamp
+        if (gestureState === 2) {
+            if (!twoFingerMoved && elapsed < 350 && !dragLocked)
+                mouseClick(2, false, touchMode === "direct_touch" ? toRemoteX(startX) : -1,
+                           touchMode === "direct_touch" ? toRemoteY(startY) : -1)
+        } else if (gestureState === 1) {
+            if (dragSelecting) {
+                releaseTouchButton()
+            } else if (!holdTriggered && !dragLocked && !singleFingerMoved && elapsed < 350) {
+                mouseClick(1, false, touchMode === "direct_touch" ? toRemoteX(startX) : -1,
+                           touchMode === "direct_touch" ? toRemoteY(startY) : -1)
+            }
+        }
+        gestureState = 0
+    }
+
+    onTouchModeChanged: cancelInput()
+    onDragLockedChanged: cancelTouch()
+    onVisibleChanged: if (!visible) cancelInput()
+
+    Timer {
+        id: longPressTimer
+        interval: 520
+        repeat: false
+        onTriggered: {
+            if (root.gestureState !== 1 || root.dragLocked) return
+            if (root.touchMode === "direct_touch") {
+                root.holdTriggered = true
+                holdRing.x = root.startX - holdRing.width / 2
+                holdRing.y = root.startY - holdRing.height / 2
+                holdRing.visible = true
+                root.mouseClick(2, false, root.toRemoteX(root.startX), root.toRemoteY(root.startY))
+            } else {
+                root.dragSelecting = true
+                root.mouseButton(1, true, -1, -1)
+            }
+        }
+    }
+
     // Visual Local Cursor in Mouse Pointer (Trackpad) Mode
     Item {
         id: pointerCursor
-        visible: root.touchMode === "mouse_pointer"
-        x: root.canvasX + (root.cursorX / Math.max(1, root.remoteWidth)) * root.canvasW
-        y: root.canvasY + (root.cursorY / Math.max(1, root.remoteHeight)) * root.canvasH
+        visible: root.touchMode === "mouse_pointer" || desktopMouse.containsMouse
+        x: root.canvasX + (root.cursorX / Math.max(1, root.remoteWidth - 1)) * root.canvasW
+        y: root.canvasY + (root.cursorY / Math.max(1, root.remoteHeight - 1)) * root.canvasH
         z: 20
 
         // Crisp white pointer arrow with dark outline
@@ -80,166 +227,74 @@ Item {
         z: 25
     }
 
+    MouseArea {
+        id: desktopMouse
+        objectName: "desktopMouse"
+        anchors.fill: parent
+        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+        hoverEnabled: true
+        preventStealing: true
+        cursorShape: Qt.BlankCursor
+        property int remoteButtons: 0
+
+        function releaseButtons() {
+            for (var button = 1; button <= 4; button *= 2) {
+                if (remoteButtons & button) root.mouseButton(button, false, -1, -1)
+            }
+            remoteButtons = 0
+        }
+
+        onPressed: {
+            if (!root.insideCanvas(mouse.x, mouse.y)) return
+            remoteButtons |= mouse.button
+            root.mouseButton(mouse.button, true, root.toRemoteX(mouse.x), root.toRemoteY(mouse.y))
+        }
+        onPositionChanged: {
+            if (root.insideCanvas(mouse.x, mouse.y) || remoteButtons)
+                root.absoluteMove(root.toRemoteX(mouse.x), root.toRemoteY(mouse.y))
+        }
+        onReleased: {
+            if (remoteButtons & mouse.button) {
+                remoteButtons &= ~mouse.button
+                root.mouseButton(mouse.button, false, root.toRemoteX(mouse.x), root.toRemoteY(mouse.y))
+            }
+        }
+        onCanceled: releaseButtons()
+        onWheel: root.mouseScroll(wheel.angleDelta.y, wheel.angleDelta.x)
+    }
+
     MultiPointTouchArea {
         id: touchArea
         anchors.fill: parent
         minimumTouchPoints: 1
         maximumTouchPoints: 2
-
-        property real lastP1X: 0
-        property real lastP1Y: 0
-        property real startP1X: 0
-        property real startP1Y: 0
-        property real lastP2Y: 0
-        property real lastP2X: 0
-        property bool twoFingerActive: false
-        property bool twoFingerMoved: false
-        property bool dragSelecting: false
-        property double pressTimestamp: 0
-        property double lastTapTimestamp: 0
+        mouseEnabled: false
 
         touchPoints: [
             TouchPoint { id: tp1 },
             TouchPoint { id: tp2 }
         ]
 
-        Timer {
-            id: longPressTimer
-            interval: 520
-            repeat: false
-            onTriggered: {
-                if (touchArea.twoFingerActive) return
-                var dist = Math.hypot(tp1.x - touchArea.startP1X, tp1.y - touchArea.startP1Y)
-                if (dist < units.gu(1.5)) {
-                    if (root.touchMode === "direct_touch") {
-                        holdRing.x = tp1.x - holdRing.width / 2
-                        holdRing.y = tp1.y - holdRing.height / 2
-                        holdRing.visible = true
-                        var rx = root.toRemoteX(tp1.x)
-                        var ry = root.toRemoteY(tp1.y)
-                        root.mouseClick(2, false, rx, ry)
-                    } else {
-                        touchArea.dragSelecting = true
-                        root.mouseButton(1, true, root.cursorX, root.cursorY)
-                    }
-                }
-            }
-        }
-
         onPressed: {
-            holdRing.visible = false
             if (tp1.pressed && tp2.pressed) {
-                twoFingerActive = true
-                twoFingerMoved = false
-                longPressTimer.stop()
-                lastP2X = (tp1.x + tp2.x) / 2
-                lastP2Y = (tp1.y + tp2.y) / 2
-            } else if (tp1.pressed) {
-                twoFingerActive = false
-                dragSelecting = false
-                startP1X = tp1.x
-                startP1Y = tp1.y
-                lastP1X = tp1.x
-                lastP1Y = tp1.y
-                pressTimestamp = Date.now()
-                longPressTimer.restart()
+                root.beginTwo((tp1.x + tp2.x) / 2, (tp1.y + tp2.y) / 2)
+            } else if (root.gestureState === 0) {
+                var point = tp1.pressed ? tp1 : tp2
+                root.beginSingle(point.x, point.y)
             }
         }
-
         onUpdated: {
             if (tp1.pressed && tp2.pressed) {
-                twoFingerActive = true
-                var midX = (tp1.x + tp2.x) / 2
-                var midY = (tp1.y + tp2.y) / 2
-                var dy = midY - lastP2Y
-                var dx = midX - lastP2X
-                if (Math.abs(dy) > units.gu(0.8) || Math.abs(dx) > units.gu(0.8)) {
-                    twoFingerMoved = true
-                    var vUnits = Math.round(dy * 2.5)
-                    var hUnits = Math.round(-dx * 2.5)
-                    root.mouseScroll(vUnits, hUnits)
-                    lastP2X = midX
-                    lastP2Y = midY
-                }
-                return
-            }
-
-            if (tp1.pressed && !twoFingerActive) {
-                var deltaX = tp1.x - lastP1X
-                var deltaY = tp1.y - lastP1Y
-                lastP1X = tp1.x
-                lastP1Y = tp1.y
-
-                if (Math.hypot(tp1.x - startP1X, tp1.y - startP1Y) > units.gu(1.2)) {
-                    longPressTimer.stop()
-                }
-
-                if (root.touchMode === "mouse_pointer") {
-                    var scaleX = root.remoteWidth / Math.max(1, root.canvasW)
-                    var scaleY = root.remoteHeight / Math.max(1, root.canvasH)
-                    root.relativeMove(deltaX * scaleX, deltaY * scaleY)
-                } else {
-                    var rx = root.toRemoteX(tp1.x)
-                    var ry = root.toRemoteY(tp1.y)
-                    root.absoluteMove(rx, ry)
-                }
+                root.updateTwo((tp1.x + tp2.x) / 2, (tp1.y + tp2.y) / 2)
+            } else if (root.gestureState === 1) {
+                var point = tp1.pressed ? tp1 : tp2
+                root.updateSingle(point.x, point.y)
             }
         }
-
         onReleased: {
-            longPressTimer.stop()
-            holdRing.visible = false
-
-            if (twoFingerActive && !tp1.pressed && !tp2.pressed) {
-                if (!twoFingerMoved) {
-                    // 2-finger tap = Right Click
-                    root.mouseClick(2, false, root.cursorX, root.cursorY)
-                }
-                twoFingerActive = false
-                return
-            }
-
-            if (dragSelecting) {
-                dragSelecting = false
-                root.mouseButton(1, false, root.cursorX, root.cursorY)
-                return
-            }
-
-            var elapsed = Date.now() - pressTimestamp
-            var totalMove = Math.hypot(tp1.x - startP1X, tp1.y - startP1Y)
-            if (elapsed < 350 && totalMove < units.gu(1.5)) {
-                var now = Date.now()
-                var isDouble = (now - lastTapTimestamp) < 320
-                lastTapTimestamp = now
-
-                if (root.touchMode === "direct_touch") {
-                    var rx = root.toRemoteX(startP1X)
-                    var ry = root.toRemoteY(startP1Y)
-                    root.mouseClick(1, isDouble, rx, ry)
-                } else {
-                    root.mouseClick(1, isDouble, root.cursorX, root.cursorY)
-                }
-            }
+            if (!tp1.pressed && !tp2.pressed) root.finishTouch()
         }
-    }
-
-    // Support desktop mouse wheel in Lomiri Convergence mode
-    MouseArea {
-        anchors.fill: parent
-        acceptedButtons: Qt.RightButton | Qt.MiddleButton
-        hoverEnabled: false
-        onClicked: {
-            var btn = (mouse.button === Qt.RightButton) ? 2 : 4
-            if (root.touchMode === "direct_touch") {
-                root.mouseClick(btn, false, root.toRemoteX(mouse.x), root.toRemoteY(mouse.y))
-            } else {
-                root.mouseClick(btn, false, root.cursorX, root.cursorY)
-            }
-        }
-        onWheel: {
-            var vDelta = Math.round(wheel.angleDelta.y / 2)
-            var hDelta = Math.round(wheel.angleDelta.x / 2)
-            root.mouseScroll(vDelta, hDelta)
-        }
+        onCanceled: root.cancelTouch()
+        onGestureStarted: gesture.grab()
     }
 }
