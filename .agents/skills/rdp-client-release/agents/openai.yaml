@@ -1,0 +1,4 @@
+interface:
+  display_name: "RDP Client Release"
+  short_description: "Develop and release RDP Client to GitHub and OpenStore"
+  default_prompt: "Use $rdp-client-release to prepare and publish the next Open RDP Client version to GitHub and OpenStore."

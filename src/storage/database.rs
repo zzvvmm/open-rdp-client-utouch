@@ -8,6 +8,11 @@ use crate::models::{
 };
 
 pub const APP_ID: &str = "rdp-client-ut.zzvvmm";
+pub const APP_FRAMEWORK: &str = "ubuntu-touch-24.04-1.x";
+
+fn automatic_updates_enabled() -> bool {
+    true
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppSettings {
@@ -20,6 +25,12 @@ pub struct AppSettings {
     pub trackpad_speed_percent: u32,
     pub show_stats_overlay: bool,
     pub strict_cert_check: bool,
+    #[serde(default = "automatic_updates_enabled")]
+    pub auto_check_updates: bool,
+    #[serde(default)]
+    pub skipped_update_version: String,
+    #[serde(default)]
+    pub last_update_check_epoch: u64,
 }
 
 impl Default for AppSettings {
@@ -34,6 +45,9 @@ impl Default for AppSettings {
             trackpad_speed_percent: 100,
             show_stats_overlay: false,
             strict_cert_check: false,
+            auto_check_updates: true,
+            skipped_update_version: String::new(),
+            last_update_check_epoch: 0,
         }
     }
 }
@@ -141,6 +155,40 @@ impl StorageDatabase {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn legacy_settings_keep_preferences_and_enable_update_checks() {
+        let mut legacy = serde_json::to_value(AppSettings::default()).unwrap();
+        let object = legacy.as_object_mut().unwrap();
+        object.remove("auto_check_updates");
+        object.remove("skipped_update_version");
+        object.remove("last_update_check_epoch");
+        object.insert("theme_mode".into(), serde_json::json!("light"));
+        object.insert("trackpad_speed_percent".into(), serde_json::json!(150));
+        let settings: AppSettings = serde_json::from_value(legacy).unwrap();
+        assert!(settings.auto_check_updates);
+        assert!(settings.skipped_update_version.is_empty());
+        assert_eq!(settings.last_update_check_epoch, 0);
+        assert_eq!(settings.theme_mode, "light");
+        assert_eq!(settings.trackpad_speed_percent, 150);
+    }
+
+    #[test]
+    fn update_preferences_survive_reopening_storage() {
+        let dir = tempdir().unwrap();
+        let config = dir.path().join("config");
+        let cache = dir.path().join("cache");
+        let db = StorageDatabase::open_at(config.clone(), cache.clone()).unwrap();
+        let settings = AppSettings {
+            auto_check_updates: false,
+            skipped_update_version: "0.1.4".into(),
+            last_update_check_epoch: 1_800_000_000,
+            ..AppSettings::default()
+        };
+        db.save_settings(&settings).unwrap();
+        let reopened = StorageDatabase::open_at(config, cache).unwrap();
+        assert_eq!(reopened.load_settings(), settings);
+    }
 
     #[test]
     fn test_storage_crud_roundtrip() {

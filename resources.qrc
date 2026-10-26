@@ -21,5 +21,7 @@
         <file>qml/components/SessionHudPill.qml</file>
         <file>qml/components/VirtualKeyBar.qml</file>
         <file>qml/components/CertPromptDialog.qml</file>
+        <file>qml/components/UpdateManager.qml</file>
+        <file>qml/components/UpdatePrompt.qml</file>
     </qresource>
 </RCC>

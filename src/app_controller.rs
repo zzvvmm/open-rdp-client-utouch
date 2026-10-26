@@ -173,6 +173,14 @@ impl AppController {
 
         let payload = json!({
             "type": "state_snapshot",
+            "appVersion": env!("CARGO_PKG_VERSION"),
+            "appArchitecture": match std::env::consts::ARCH {
+                "aarch64" => "arm64",
+                "x86_64" => "amd64",
+                "arm" => "armhf",
+                other => other,
+            },
+            "appFramework": crate::storage::database::APP_FRAMEWORK,
             "profiles": profiles_json,
             "accounts": accounts_json,
             "knownCerts": certs_json,
@@ -186,6 +194,9 @@ impl AppController {
                 "trackpadSpeedPercent": settings.trackpad_speed_percent,
                 "showStatsOverlay": settings.show_stats_overlay,
                 "strictCertCheck": settings.strict_cert_check,
+                "autoCheckUpdates": settings.auto_check_updates,
+                "skippedUpdateVersion": settings.skipped_update_version,
+                "lastUpdateCheckEpoch": settings.last_update_check_epoch,
             },
             "session": {
                 "activeProfileId": active_id,
@@ -693,6 +704,15 @@ impl AppController {
         if let Some(strict) = v.get("strictCertCheck").and_then(Value::as_bool) {
             settings.strict_cert_check = strict;
         }
+        if let Some(enabled) = v.get("autoCheckUpdates").and_then(Value::as_bool) {
+            settings.auto_check_updates = enabled;
+        }
+        if let Some(version) = v.get("skippedUpdateVersion").and_then(Value::as_str) {
+            settings.skipped_update_version = version.to_string();
+        }
+        if let Some(epoch) = v.get("lastUpdateCheckEpoch").and_then(Value::as_u64) {
+            settings.last_update_check_epoch = epoch;
+        }
         self.db.save_settings(&settings)
     }
 
@@ -1018,6 +1038,43 @@ impl AppController {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn update_preferences_are_exposed_and_other_setting_patches_preserve_them() {
+        let dir = tempdir().unwrap();
+        let db = StorageDatabase::open_at(
+            dir.path().join("config"),
+            dir.path().join("cache"),
+        )
+        .unwrap();
+        let vault = CredentialVault::open_at(dir.path().join("vault")).unwrap();
+        let events = Arc::new(Mutex::new(Vec::<Value>::new()));
+        let captured = Arc::clone(&events);
+        let ctrl = AppController::new(
+            db.clone(),
+            vault,
+            Arc::new(move |json, _| {
+                captured.lock().unwrap().push(serde_json::from_str(json).unwrap());
+            }),
+        );
+        ctrl.dispatch_action(r#"{"action":"init"}"#).unwrap();
+        let first = events.lock().unwrap()[0].clone();
+        assert_eq!(first["appVersion"], env!("CARGO_PKG_VERSION"));
+        assert_eq!(first["appFramework"], crate::storage::database::APP_FRAMEWORK);
+        assert!(first["appArchitecture"].as_str().is_some());
+        assert_eq!(first["settings"]["autoCheckUpdates"], true);
+        ctrl.dispatch_action(r#"{"action":"save_settings","autoCheckUpdates":false,"skippedUpdateVersion":"0.1.4","lastUpdateCheckEpoch":1800000000}"#).unwrap();
+        ctrl.dispatch_action(r#"{"action":"save_settings","themeMode":"light"}"#).unwrap();
+        let stored = db.load_settings();
+        assert!(!stored.auto_check_updates);
+        assert_eq!(stored.skipped_update_version, "0.1.4");
+        assert_eq!(stored.last_update_check_epoch, 1_800_000_000);
+        assert_eq!(stored.theme_mode, "light");
+        let last = events.lock().unwrap().last().cloned().unwrap();
+        assert_eq!(last["settings"]["autoCheckUpdates"], false);
+        assert_eq!(last["settings"]["skippedUpdateVersion"], "0.1.4");
+        assert_eq!(last["settings"]["lastUpdateCheckEpoch"], 1_800_000_000_u64);
+    }
 
     #[test]
     fn test_controller_pc_and_account_lifecycle() {

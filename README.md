@@ -4,6 +4,9 @@
 
 The package ID remains `rdp-client-ut.zzvvmm` for compatibility with existing installations and saved data.
 
+For the development workflow, version bumps, and releases to GitHub and OpenStore,
+see the [development and release guide](docs/RELEASING.md).
+
 ---
 
 ## Features
@@ -28,6 +31,11 @@ The package ID remains `rdp-client-ut.zzvvmm` for compatibility with existing in
   - **3-State Sticky Modifier & Function Key Bar (`VirtualKeyBar.qml`)**: `Ctrl`, `Alt`, `Shift`, and `Win` support `Off` → `Latched (•)` → `Locked (••)`, alongside `Esc`, `Tab`, arrow keys, `Home`/`End`/`PgUp`/`PgDn`, `F1`–`F12`, and one-tap shortcuts (`Ctrl+Alt+Del`, `Alt+Tab`, `Win+D`, `Win+L`, `Ctrl+Shift+Esc`).
 - **Encrypted Local Credential Vault (`src/storage/credentials.rs`)**
   - Reusable User Accounts (`AccountsPage.qml`) with passwords sealed in `$XDG_DATA_HOME/rdp-client-ut.zzvvmm/vault.json`.
+- **Update Checks (`Settings → Updates`)**
+  - Automatic OpenStore checks are enabled by default and run at most once a day when opening or resuming the app, outside remote sessions and dialogs.
+  - **Check for updates** works even with automatic checks disabled and shows skipped updates when explicitly requested.
+  - Available updates show their changelog with **Update Now**, **Update Later**, and **Skip This Version**. Update Now opens the app in OpenStore for installation; Later reminds at the next scheduled check, while Skip remembers that specific version across restarts.
+  - Only stable releases for the installed architecture and framework are offered. Offline automatic checks stay quiet; manual check results appear in Settings.
 
 ---
 

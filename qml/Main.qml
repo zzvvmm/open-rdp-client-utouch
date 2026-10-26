@@ -27,8 +27,15 @@ MainView {
         defaultClipboardEnabled: true,
         trackpadSpeedPercent: 100,
         showStatsOverlay: false,
-        strictCertCheck: false
+        strictCertCheck: false,
+        autoCheckUpdates: true,
+        skippedUpdateVersion: "",
+        lastUpdateCheckEpoch: 0
     })
+    property bool settingsLoaded: false
+    property string appVersion: ""
+    property string appArchitecture: ""
+    property string appFramework: ""
 
     property string activeProfileId: ""
     property string activePcTitle: "Remote PC"
@@ -87,6 +94,26 @@ MainView {
         sendAction({ action: "init" })
     }
 
+    UpdateManager {
+        id: updates
+        ready: mainView.settingsLoaded
+        installedVersion: mainView.appVersion
+        architecture: mainView.appArchitecture
+        framework: mainView.appFramework
+        automaticEnabled: mainView.appSettings.autoCheckUpdates !== false
+        skippedVersion: mainView.appSettings.skippedUpdateVersion || ""
+        lastCheckedAt: mainView.appSettings.lastUpdateCheckEpoch || 0
+        appActive: Qt.application.state === Qt.ApplicationActive
+        canPrompt: !mainView.inSessionView && !mainView.showCredPrompt
+                   && mainView.pendingCertPrompt === null && !pcEditor.visible
+        onSavePreferences: {
+            var payload = { action: "save_settings" }
+            for (var key in patch) payload[key] = patch[key]
+            mainView.sendAction(payload)
+        }
+        onOpenStoreRequested: updates.storeOpened(Qt.openUrlExternally(uri))
+    }
+
     Connections {
         target: RdpBridge
 
@@ -99,11 +126,15 @@ MainView {
             }
 
             if (ev.type === "state_snapshot") {
+                mainView.appVersion = ev.appVersion || ""
+                mainView.appArchitecture = ev.appArchitecture || ""
+                mainView.appFramework = ev.appFramework || ""
                 mainView.profilesList = ev.profiles || []
                 mainView.accountsList = ev.accounts || []
                 mainView.knownCertsList = ev.knownCerts || []
                 if (ev.settings) {
                     mainView.appSettings = ev.settings
+                    mainView.settingsLoaded = true
                 }
                 if (ev.session) {
                     mainView.activeProfileId = ev.session.activeProfileId || ""
@@ -288,6 +319,12 @@ MainView {
                 darkMode: mainView.isDarkMode
 
                 onUpdateSettings: mainView.sendAction(payload)
+                appVersion: mainView.appVersion
+                updateStatus: updates.status
+                updateChecking: updates.checking
+                updateReady: updates.ready
+                skippedVersion: updates.skippedVersion
+                onCheckUpdatesRequested: updates.checkForUpdates(true)
             }
         }
 
@@ -378,6 +415,18 @@ MainView {
             darkMode: mainView.isDarkMode
             accounts: mainView.accountsList
             onSaveRequested: mainView.sendAction(payload)
+        }
+
+        UpdatePrompt {
+            visible: updates.promptVisible
+            version: updates.availableUpdate ? updates.availableUpdate.version : ""
+            changelog: updates.availableUpdate ? updates.availableUpdate.changelog : ""
+            installedVersion: mainView.appVersion
+            darkMode: mainView.isDarkMode
+            openFailed: updates.status === "openFailed"
+            onUpdateNow: updates.updateNow()
+            onUpdateLater: updates.updateLater()
+            onSkipVersion: updates.skipVersion()
         }
 
         // On-Demand Credentials Prompt Dialog ("Ask every time")
