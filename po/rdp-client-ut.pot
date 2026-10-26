@@ -74,3 +74,72 @@ msgstr ""
 
 msgid "Super / Win"
 msgstr ""
+
+msgid "Update available"
+msgstr ""
+
+msgid "Open RDP Client "
+msgstr ""
+
+msgid "Installed version: "
+msgstr ""
+
+msgid "Changelog"
+msgstr ""
+
+msgid "No changelog was provided for this version."
+msgstr ""
+
+msgid "OpenStore will open so you can download and install the update."
+msgstr ""
+
+msgid "Could not open OpenStore. Please try again or choose Update Later."
+msgstr ""
+
+msgid "Update Now"
+msgstr ""
+
+msgid "Update Later"
+msgstr ""
+
+msgid "Skip This Version"
+msgstr ""
+
+msgid "Checking for updates…"
+msgstr ""
+
+msgid "You are up to date."
+msgstr ""
+
+msgid "An update is available. Check again to view it."
+msgstr ""
+
+msgid "Could not check for updates. Check your connection and try again."
+msgstr ""
+
+msgid "Update information is unavailable for this device. Please try again later."
+msgstr ""
+
+msgid "Continue updating in OpenStore."
+msgstr ""
+
+msgid "Could not open OpenStore. Please try again."
+msgstr ""
+
+msgid "Updates"
+msgstr ""
+
+msgid "Automatically check for updates"
+msgstr ""
+
+msgid "Check once a day when the app is opened or resumed. Manual checks are always available."
+msgstr ""
+
+msgid "Checking…"
+msgstr ""
+
+msgid "Check for updates"
+msgstr ""
+
+msgid "Skipped version: "
+msgstr ""

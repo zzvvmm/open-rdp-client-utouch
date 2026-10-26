@@ -6,30 +6,39 @@ Flickable {
 
     property var settings: ({})
     property bool darkMode: true
+    property string appVersion: ""
+    property string updateStatus: "idle"
+    property bool updateChecking: false
+    property bool updateReady: false
+    property string skippedVersion: ""
 
     signal updateSettings(var payload)
+    signal checkUpdatesRequested()
 
     contentWidth: width
     contentHeight: settingsCol.implicitHeight + units.gu(6)
     clip: true
 
     function pushUpdate(patch) {
-        var next = {
-            action: "save_settings",
-            themeMode: settings.themeMode || "dark",
-            defaultResolution: settings.defaultResolution || "dynamic",
-            defaultScaleFactor: settings.defaultScaleFactor || 100,
-            defaultTouchMode: settings.defaultTouchMode || "mouse_pointer",
-            defaultAudioMode: settings.defaultAudioMode || "play_on_device",
-            defaultClipboardEnabled: (settings.defaultClipboardEnabled !== undefined) ? settings.defaultClipboardEnabled : true,
-            trackpadSpeedPercent: settings.trackpadSpeedPercent || 100,
-            showStatsOverlay: !!settings.showStatsOverlay,
-            strictCertCheck: !!settings.strictCertCheck
-        }
+        // The backend merges patches; avoid overwriting update preferences with stale UI values.
+        var next = { action: "save_settings" }
         for (var k in patch) {
             next[k] = patch[k]
         }
         root.updateSettings(next)
+    }
+
+    function updateStatusText() {
+        switch (updateStatus) {
+        case "checking": return i18n.tr("Checking for updates…")
+        case "upToDate": return i18n.tr("You are up to date.")
+        case "available": return i18n.tr("An update is available. Check again to view it.")
+        case "error": return i18n.tr("Could not check for updates. Check your connection and try again.")
+        case "unavailable": return i18n.tr("Update information is unavailable for this device. Please try again later.")
+        case "openingStore": return i18n.tr("Continue updating in OpenStore.")
+        case "openFailed": return i18n.tr("Could not open OpenStore. Please try again.")
+        default: return ""
+        }
     }
 
     Column {
@@ -137,6 +146,86 @@ Flickable {
                         color: root.darkMode ? "#F3F6FA" : "#1B2028"
                         anchors.verticalCenter: parent.verticalCenter
                     }
+                }
+            }
+        }
+
+        Rectangle {
+            width: parent.width
+            height: updatesCol.implicitHeight + units.gu(3)
+            radius: units.gu(1.4)
+            color: root.darkMode ? "#1C2331" : "#FFFFFF"
+            border.width: units.dp(1)
+            border.color: root.darkMode ? "#2B3548" : "#DCE2EC"
+
+            Column {
+                id: updatesCol
+                width: parent.width - units.gu(3)
+                anchors.centerIn: parent
+                spacing: units.gu(1.2)
+
+                Label {
+                    text: i18n.tr("Updates")
+                    fontSize: "medium"
+                    font.bold: true
+                    color: root.darkMode ? "#F3F6FA" : "#1B2028"
+                }
+                Label {
+                    width: parent.width
+                    text: i18n.tr("Installed version: ") + root.appVersion
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                    fontSize: "small"
+                    color: root.darkMode ? "#9BA7B8" : "#5A6577"
+                }
+                Row {
+                    width: parent.width
+                    spacing: units.gu(1.5)
+                    CheckBox {
+                        id: autoUpdates
+                        objectName: "automaticUpdatesCheckBox"
+                        checked: root.settings.autoCheckUpdates !== false
+                        onClicked: root.pushUpdate({ autoCheckUpdates: checked })
+                    }
+                    Label {
+                        width: parent.width - autoUpdates.width - parent.spacing
+                        text: i18n.tr("Automatically check for updates")
+                        wrapMode: Text.WordWrap
+                        color: root.darkMode ? "#F3F6FA" : "#1B2028"
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+                Label {
+                    width: parent.width
+                    text: i18n.tr("Check once a day when the app is opened or resumed. Manual checks are always available.")
+                    wrapMode: Text.WordWrap
+                    fontSize: "small"
+                    color: root.darkMode ? "#9BA7B8" : "#5A6577"
+                }
+                Button {
+                    objectName: "checkUpdatesButton"
+                    width: parent.width
+                    text: root.updateChecking ? i18n.tr("Checking…") : i18n.tr("Check for updates")
+                    enabled: root.updateReady && !root.updateChecking
+                    color: "#0078D4"
+                    onClicked: root.checkUpdatesRequested()
+                }
+                Label {
+                    width: parent.width
+                    visible: text.length > 0
+                    text: root.updateStatusText()
+                    wrapMode: Text.WordWrap
+                    fontSize: "small"
+                    color: root.darkMode ? "#9BA7B8" : "#5A6577"
+                }
+                Label {
+                    width: parent.width
+                    visible: root.skippedVersion.length > 0
+                    text: i18n.tr("Skipped version: ") + root.skippedVersion
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WordWrap
+                    fontSize: "small"
+                    color: root.darkMode ? "#9BA7B8" : "#5A6577"
                 }
             }
         }
