@@ -2,8 +2,6 @@
 
 **Open RDP Client** is an open-source (**GPL-3.0-or-later**) Remote Desktop Protocol (RDP) client for **Ubuntu Touch (Lomiri)** powered by a pure-Rust **IronRDP** backend and a **QtQuick / Lomiri UI Toolkit** frontend inspired by Microsoft's **Windows App** (formerly Microsoft Remote Desktop).
 
-The package ID remains `rdp-client-ut.zzvvmm` for compatibility with existing installations and saved data.
-
 For the development workflow, version bumps, and releases to GitHub and OpenStore,
 see the [development and release guide](docs/RELEASING.md).
 
