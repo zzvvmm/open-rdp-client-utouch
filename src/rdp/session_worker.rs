@@ -833,11 +833,26 @@ async fn drive_active_session(
                 } else {
                     None
                 };
-                active_stage.process(
+                let action_name = match &action {
+                    ironrdp_pdu::Action::FastPath => "fast-path",
+                    ironrdp_pdu::Action::X224 => "x224",
+                };
+                match active_stage.process(
                     &mut image,
                     action,
                     normalized_payload.as_deref().unwrap_or(&payload),
-                )?
+                ) {
+                    Ok(outputs) => outputs,
+                    Err(error) => {
+                        tracing::error!(
+                            action = action_name,
+                            payload_len = payload.len(),
+                            error = ?error,
+                            "Failed to process server RDP update"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             Some(clip_msg) = clipboard_msg_rx.recv() => {
                 process_clipboard_message(&mut active_stage, clip_msg)?
