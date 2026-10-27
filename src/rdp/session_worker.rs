@@ -11,11 +11,12 @@ use ironrdp_connector::{
     custom_err, general_err, BitmapConfig, ClientConnector, ConnectionResult, ConnectorResult,
     Credentials, DesktopSize, ServerName as RdpServerName,
 };
-use ironrdp_core::WriteBuf;
+use ironrdp_core::{decode_cursor, WriteBuf};
 use ironrdp_displaycontrol::client::DisplayControlClient;
 use ironrdp_dvc::DrdynvcClient;
 use ironrdp_echo::client::EchoClient;
 use ironrdp_graphics::image_processing::PixelFormat;
+use ironrdp_pdu::fast_path::FastPathHeader;
 use ironrdp_pdu::gcc::KeyboardType;
 use ironrdp_pdu::geometry::Rectangle as _;
 use ironrdp_pdu::input::fast_path::FastPathInputEvent;
@@ -827,7 +828,16 @@ async fn drive_active_session(
         let outputs = tokio::select! {
             frame = reader.read_pdu() => {
                 let (action, payload) = frame.map_err(|e| ironrdp_session::custom_err!("read PDU", e))?;
-                active_stage.process(&mut image, action, &payload)?
+                let normalized_payload = if matches!(&action, ironrdp_pdu::Action::FastPath) {
+                    normalize_unsupported_fast_path_updates(&payload)
+                } else {
+                    None
+                };
+                active_stage.process(
+                    &mut image,
+                    action,
+                    normalized_payload.as_deref().unwrap_or(&payload),
+                )?
             }
             Some(clip_msg) = clipboard_msg_rx.recv() => {
                 process_clipboard_message(&mut active_stage, clip_msg)?
@@ -983,6 +993,50 @@ async fn drive_active_session(
     Ok(SessionLoopFlow::TerminatedGracefully(reason))
 }
 
+fn normalize_unsupported_fast_path_updates(frame: &[u8]) -> Option<Vec<u8>> {
+    let mut cursor = ironrdp_core::ReadCursor::new(frame);
+    let header = decode_cursor::<FastPathHeader>(&mut cursor).ok()?;
+    if !header.flags.is_empty() || header.data_length != cursor.len() {
+        return None;
+    }
+
+    let mut normalized = None;
+    while !cursor.is_empty() {
+        let update_header_offset = cursor.pos();
+        if cursor.len() < 1 {
+            return None;
+        }
+
+        let update_header = cursor.read_u8();
+        let update_code = update_header & 0x0F;
+        let has_compression_flags = update_header & 0x80 != 0;
+        let pdu_header_size = usize::from(has_compression_flags) + 2;
+        if cursor.len() < pdu_header_size {
+            return None;
+        }
+        if has_compression_flags {
+            cursor.advance(1);
+        }
+        let data_length = usize::from(cursor.read_u16());
+        if cursor.len() < data_length {
+            return None;
+        }
+        cursor.advance(data_length);
+
+        if matches!(update_code, 0x07 | 0x0D..=0x0F) {
+            // IronRDP rejects unknown codes before its processor can ignore the update.
+            let frame = normalized.get_or_insert_with(|| frame.to_vec());
+            frame[update_header_offset] = (update_header & 0xF0) | 0x03;
+            tracing::warn!(
+                update_code,
+                "Ignoring unsupported Fast-Path update while preserving the session"
+            );
+        }
+    }
+
+    normalized
+}
+
 fn process_clipboard_message(
     active_stage: &mut ironrdp_session::ActiveStage,
     msg: ClipboardMessage,
@@ -1117,7 +1171,87 @@ async fn send_kdc_udp(url: &Url, data: &[u8]) -> ConnectorResult<Vec<u8>> {
 #[cfg(test)]
 mod connection_tests {
     use super::*;
+    use ironrdp_core::encode_vec;
+    use ironrdp_pdu::fast_path::{EncryptionFlags, FastPathUpdatePdu, UpdateCode};
     use tokio::net::TcpListener;
+
+    #[test]
+    fn skips_unknown_fast_path_update_codes_without_losing_following_updates() {
+        let updates = [
+            0x0D, 0x02, 0x00, 0xAA, 0xBB, // Unknown update with a two-byte payload.
+            0x01, 0x01, 0x00, 0xCC, // Bitmap update that follows it.
+        ];
+        let mut frame = encode_vec(&FastPathHeader::new(
+            EncryptionFlags::empty(),
+            updates.len(),
+        ))
+        .unwrap();
+        frame.extend_from_slice(&updates);
+
+        let normalized = normalize_unsupported_fast_path_updates(&frame).unwrap();
+        let mut cursor = ironrdp_core::ReadCursor::new(&normalized);
+        decode_cursor::<FastPathHeader>(&mut cursor).unwrap();
+        let skipped = decode_cursor::<FastPathUpdatePdu<'_>>(&mut cursor).unwrap();
+        let following = decode_cursor::<FastPathUpdatePdu<'_>>(&mut cursor).unwrap();
+
+        assert_eq!(skipped.update_code, UpdateCode::Synchronize);
+        assert_eq!(skipped.data, &[0xAA, 0xBB]);
+        assert_eq!(following.update_code, UpdateCode::Bitmap);
+        assert_eq!(following.data, &[0xCC]);
+    }
+
+    #[test]
+    fn leaves_supported_and_malformed_fast_path_updates_unchanged() {
+        let updates = [0x01, 0x01, 0x00, 0xCC];
+        let mut frame = encode_vec(&FastPathHeader::new(
+            EncryptionFlags::empty(),
+            updates.len(),
+        ))
+        .unwrap();
+        frame.extend_from_slice(&updates);
+        assert!(normalize_unsupported_fast_path_updates(&frame).is_none());
+
+        let malformed = [0x00, 0x04, 0x0D, 0x05, 0x00, 0xAA];
+        assert!(normalize_unsupported_fast_path_updates(&malformed).is_none());
+    }
+
+    #[test]
+    fn does_not_inspect_encrypted_fast_path_payloads() {
+        let updates = [0x0D, 0x01, 0x00, 0xCC];
+        let mut frame = encode_vec(&FastPathHeader::new(
+            EncryptionFlags::ENCRYPTED,
+            updates.len(),
+        ))
+        .unwrap();
+        frame.extend_from_slice(&updates);
+
+        assert!(normalize_unsupported_fast_path_updates(&frame).is_none());
+    }
+
+    #[test]
+    fn preserves_compression_and_payload_bytes_when_normalizing_unknown_update() {
+        let updates = [0x8D, 0x20, 0x02, 0x00, 0xAA, 0xBB];
+        let mut frame = encode_vec(&FastPathHeader::new(
+            EncryptionFlags::empty(),
+            updates.len(),
+        ))
+        .unwrap();
+        frame.extend_from_slice(&updates);
+
+        let mut cursor = ironrdp_core::ReadCursor::new(&frame);
+        decode_cursor::<FastPathHeader>(&mut cursor).unwrap();
+        let update_header_offset = cursor.pos();
+        let normalized = normalize_unsupported_fast_path_updates(&frame).unwrap();
+
+        assert_eq!(
+            normalized[update_header_offset],
+            (frame[update_header_offset] & 0xF0) | 0x03
+        );
+        assert_eq!(
+            &normalized[update_header_offset + 1..],
+            &frame[update_header_offset + 1..]
+        );
+    }
 
     #[tokio::test]
     async fn cancel_stops_a_worker_while_server_stalls_negotiation() {
