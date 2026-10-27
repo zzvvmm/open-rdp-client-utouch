@@ -12,6 +12,8 @@
   compressed screen updates remain readable following a server resize.
 - Ignore unrecognized Fast-Path update codes while preserving subsequent
   updates, so an unsupported graphics update does not terminate the session.
+- Handle xrdp's abbreviated Server Deactivate All message as a display
+  reactivation instead of terminating with a short-header decode error.
 - Disable keyboard prediction and automatic capitalization in the PC address
   field, and commit pending keyboard input before saving, to prevent address
   rewriting or lost suffixes such as `-01`.

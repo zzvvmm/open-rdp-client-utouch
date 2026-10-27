@@ -806,6 +806,7 @@ async fn drive_active_session(
     let mut image = DecodedImage::new(PixelFormat::RgbA32, desktop_size.width, desktop_size.height);
     let activation_factory = connection_result.activation_factory;
     let compression_type = connection_result.compression_type;
+    let io_channel_id = connection_result.io_channel_id;
 
     let mut active_stage = ActiveStageBuilder {
         static_channels: connection_result.static_channels,
@@ -828,45 +829,52 @@ async fn drive_active_session(
         let outputs = tokio::select! {
             frame = reader.read_pdu() => {
                 let (action, payload) = frame.map_err(|e| ironrdp_session::custom_err!("read PDU", e))?;
-                let normalized_payload = if matches!(&action, ironrdp_pdu::Action::FastPath) {
-                    normalize_unsupported_fast_path_updates(&payload)
+                let short_deactivate_all = matches!(&action, ironrdp_pdu::Action::X224)
+                    && is_xrdp_short_deactivate_all(&payload, io_channel_id);
+                if short_deactivate_all {
+                    tracing::warn!("Handling XRDP short Server Deactivate All PDU");
+                    vec![ActiveStageOutput::DeactivateAll]
                 } else {
-                    None
-                };
-                let action_name = match &action {
-                    ironrdp_pdu::Action::FastPath => "fast-path",
-                    ironrdp_pdu::Action::X224 => "x224",
-                };
-                match active_stage.process(
-                    &mut image,
-                    action,
-                    normalized_payload.as_deref().unwrap_or(&payload),
-                ) {
-                    Ok(outputs) => outputs,
-                    Err(error) => {
-                        if action_name == "x224" {
-                            if let Ok(data_ctx) =
-                                ironrdp_pdu::mcs::decode_send_data_indication(&payload)
-                            {
-                                if data_ctx.user_data.len() < 10 {
-                                    let prefix_len = data_ctx.user_data.len().min(6);
-                                    tracing::error!(
-                                        channel_id = data_ctx.channel_id,
-                                        user_data_len = data_ctx.user_data.len(),
-                                        user_data_prefix =
-                                            %hex::encode(&data_ctx.user_data[..prefix_len]),
-                                        "Received short X.224 MCS user-data payload"
-                                    );
+                    let normalized_payload = if matches!(&action, ironrdp_pdu::Action::FastPath) {
+                        normalize_unsupported_fast_path_updates(&payload)
+                    } else {
+                        None
+                    };
+                    let action_name = match &action {
+                        ironrdp_pdu::Action::FastPath => "fast-path",
+                        ironrdp_pdu::Action::X224 => "x224",
+                    };
+                    match active_stage.process(
+                        &mut image,
+                        action,
+                        normalized_payload.as_deref().unwrap_or(&payload),
+                    ) {
+                        Ok(outputs) => outputs,
+                        Err(error) => {
+                            if action_name == "x224" {
+                                if let Ok(data_ctx) =
+                                    ironrdp_pdu::mcs::decode_send_data_indication(&payload)
+                                {
+                                    if data_ctx.user_data.len() < 10 {
+                                        let prefix_len = data_ctx.user_data.len().min(6);
+                                        tracing::error!(
+                                            channel_id = data_ctx.channel_id,
+                                            user_data_len = data_ctx.user_data.len(),
+                                            user_data_prefix =
+                                                %hex::encode(&data_ctx.user_data[..prefix_len]),
+                                            "Received short X.224 MCS user-data payload"
+                                        );
+                                    }
                                 }
                             }
+                            tracing::error!(
+                                action = action_name,
+                                payload_len = payload.len(),
+                                error = ?error,
+                                "Failed to process server RDP update"
+                            );
+                            return Err(error);
                         }
-                        tracing::error!(
-                            action = action_name,
-                            payload_len = payload.len(),
-                            error = ?error,
-                            "Failed to process server RDP update"
-                        );
-                        return Err(error);
                     }
                 }
             }
@@ -1022,6 +1030,19 @@ async fn drive_active_session(
     };
 
     Ok(SessionLoopFlow::TerminatedGracefully(reason))
+}
+
+fn is_xrdp_short_deactivate_all(frame: &[u8], io_channel_id: u16) -> bool {
+    let Ok(data_ctx) = ironrdp_pdu::mcs::decode_send_data_indication(frame) else {
+        return false;
+    };
+    if data_ctx.channel_id != io_channel_id || data_ctx.user_data.len() != 6 {
+        return false;
+    }
+
+    let total_length = u16::from_le_bytes([data_ctx.user_data[0], data_ctx.user_data[1]]);
+    let pdu_type = u16::from_le_bytes([data_ctx.user_data[2], data_ctx.user_data[3]]);
+    total_length == 6 && pdu_type == 0x16
 }
 
 fn normalize_unsupported_fast_path_updates(frame: &[u8]) -> Option<Vec<u8>> {
@@ -1202,9 +1223,37 @@ async fn send_kdc_udp(url: &Url, data: &[u8]) -> ConnectorResult<Vec<u8>> {
 #[cfg(test)]
 mod connection_tests {
     use super::*;
+    use std::borrow::Cow;
+
     use ironrdp_core::encode_vec;
     use ironrdp_pdu::fast_path::{EncryptionFlags, FastPathUpdatePdu, UpdateCode};
+    use ironrdp_pdu::mcs::{McsMessage, SendDataIndication};
+    use ironrdp_pdu::x224::X224;
     use tokio::net::TcpListener;
+
+    #[test]
+    fn recognizes_only_xrdp_short_deactivate_all_on_io_channel() {
+        let short_deactivate_all = encode_vec(&X224(McsMessage::SendDataIndication(
+            SendDataIndication {
+                initiator_id: 1001,
+                channel_id: 1003,
+                user_data: Cow::Borrowed(&[0x06, 0x00, 0x16, 0x00, 0xEF, 0x03]),
+            },
+        )))
+        .unwrap();
+        assert!(is_xrdp_short_deactivate_all(&short_deactivate_all, 1003));
+        assert!(!is_xrdp_short_deactivate_all(&short_deactivate_all, 1004));
+
+        let other_short_pdu = encode_vec(&X224(McsMessage::SendDataIndication(
+            SendDataIndication {
+                initiator_id: 1001,
+                channel_id: 1003,
+                user_data: Cow::Borrowed(&[0x06, 0x00, 0x17, 0x00, 0xEF, 0x03]),
+            },
+        )))
+        .unwrap();
+        assert!(!is_xrdp_short_deactivate_all(&other_short_pdu, 1003));
+    }
 
     #[test]
     fn skips_unknown_fast_path_update_codes_without_losing_following_updates() {
