@@ -2027,6 +2027,7 @@ dependencies = [
  "dirs",
  "flate2",
  "hex",
+ "ironrdp-bulk",
  "ironrdp-cliprdr",
  "ironrdp-connector",
  "ironrdp-core",

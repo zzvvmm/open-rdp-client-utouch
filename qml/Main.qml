@@ -8,6 +8,7 @@ MainView {
     objectName: "mainView"
     applicationName: "rdp-client-ut.zzvvmm"
     automaticOrientation: true
+    anchorToKeyboard: true
 
     width: units.gu(50)
     height: units.gu(88)
@@ -22,7 +23,7 @@ MainView {
         themeMode: "dark",
         defaultResolution: "dynamic",
         defaultScaleFactor: 100,
-        defaultTouchMode: "mouse_pointer",
+        defaultTouchMode: "direct_touch",
         defaultAudioMode: "play_on_device",
         defaultClipboardEnabled: true,
         trackpadSpeedPercent: 100,
@@ -38,10 +39,15 @@ MainView {
     property string appFramework: ""
 
     property string activeProfileId: ""
+    readonly property var activePc: {
+        for (var i = 0; i < profilesList.length; i++)
+            if (profilesList[i].id === activeProfileId) return profilesList[i]
+        return null
+    }
     property string activePcTitle: "Remote PC"
     property string sessionStage: "disconnected"
     property string sessionStageDetail: ""
-    property string touchMode: "mouse_pointer"
+    property string touchMode: "direct_touch"
     property int remoteWidth: 1280
     property int remoteHeight: 720
     property int cursorX: 640
@@ -139,7 +145,7 @@ MainView {
                 if (ev.session) {
                     mainView.activeProfileId = ev.session.activeProfileId || ""
                     mainView.sessionStage = ev.session.stage || "disconnected"
-                    mainView.touchMode = ev.session.touchMode || "mouse_pointer"
+                    mainView.touchMode = ev.session.touchMode || "direct_touch"
                     mainView.cursorX = ev.session.cursorX || 0
                     mainView.cursorY = ev.session.cursorY || 0
                     mainView.ctrlState = ev.session.ctrlState || "off"
@@ -393,6 +399,8 @@ MainView {
             sessionStage: mainView.sessionStage
             stageDetail: mainView.sessionStageDetail
             touchMode: mainView.touchMode
+            dynamicResolution: mainView.activePc !== null && mainView.activePc.resolutionPreset === "dynamic"
+            desktopScaleFactor: mainView.activePc ? mainView.activePc.scaleFactor || 100 : 100
             remoteWidth: mainView.remoteWidth
             remoteHeight: mainView.remoteHeight
             cursorX: mainView.cursorX

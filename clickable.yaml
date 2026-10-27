@@ -4,7 +4,7 @@ framework: ubuntu-touch-24.04-1.x
 qt_version: '5.15'
 kill: rdp-client-ut
 make_jobs: 2
-test: exec env LIBGL_ALWAYS_SOFTWARE=1 qmltestrunner -input tests/qml
+test: exec env LIBGL_ALWAYS_SOFTWARE=1 qmltestrunner -import tests/qml/mocks -input tests/qml
 env_vars:
   CARGO_BUILD_JOBS: '2'
   CARGO_HOME: ${ROOT}/build/cargo-home

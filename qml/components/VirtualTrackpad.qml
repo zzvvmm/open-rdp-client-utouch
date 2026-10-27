@@ -4,7 +4,7 @@ import Lomiri.Components 1.3
 Item {
     id: root
 
-    property string touchMode: "mouse_pointer" // "mouse_pointer" or "direct_touch"
+    property string touchMode: "direct_touch" // "mouse_pointer" or "direct_touch"
     property int remoteWidth: 1280
     property int remoteHeight: 720
     property int cursorX: 640

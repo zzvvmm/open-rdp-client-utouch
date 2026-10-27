@@ -13,7 +13,6 @@ use ironrdp_connector::{
 };
 use ironrdp_core::WriteBuf;
 use ironrdp_displaycontrol::client::DisplayControlClient;
-use ironrdp_displaycontrol::pdu::MonitorLayoutEntry;
 use ironrdp_dvc::DrdynvcClient;
 use ironrdp_echo::client::EchoClient;
 use ironrdp_graphics::image_processing::PixelFormat;
@@ -46,6 +45,7 @@ use crate::models::AudioRedirectionMode;
 use crate::rdp::audio::{PcmAudioChunk, UtRdpsndHandler};
 use crate::rdp::canvas_item::{DirtyRect, SharedFrameBuffer};
 use crate::rdp::clipboard::UtClipboardBackend;
+use crate::rdp::display_resize::DisplayResize;
 use crate::rdp::transport;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -218,7 +218,7 @@ pub fn spawn_rdp_session(
 }
 
 async fn run_session_lifecycle(
-    mut config: RdpSessionConfig,
+    config: RdpSessionConfig,
     framebuffer: Arc<Mutex<SharedFrameBuffer>>,
     cert_store: Arc<Mutex<CertStore>>,
     mut cmd_rx: mpsc::UnboundedReceiver<RdpCommand>,
@@ -245,118 +245,104 @@ async fn run_session_lifecycle(
     let local_clipboard_text = Arc::new(Mutex::new(String::new()));
     let mut pending_commands = VecDeque::new();
 
-    loop {
-        let (clipboard_msg_tx, mut clipboard_msg_rx) = mpsc::unbounded_channel();
-        let connecting = connect_and_authenticate(
-            &config,
-            &cert_store,
-            &mut cert_rx_opt,
-            &local_clipboard_text,
-            &clipboard_msg_tx,
-            &emit,
-        );
-        // Cancel DNS, TCP, and stalled negotiations promptly when leaving the
-        // session view; an old worker must not connect after the user gives up.
-        let connect_res = tokio::select! {
-            result = connecting => result,
-            _ = async {
-                while let Some(command) = cmd_rx.recv().await {
-                    if matches!(command, RdpCommand::Disconnect) { break; }
-                    // Preserve input/resize commands received during the handshake.
-                    pending_commands.push_back(command);
-                }
-            } => {
-                emit(RdpWorkerEvent::SessionEnded {
-                    profile_id,
-                    reason: "Connection cancelled".to_string(),
-                    is_error: false,
-                });
-                return;
+    let (clipboard_msg_tx, mut clipboard_msg_rx) = mpsc::unbounded_channel();
+    let connecting = connect_and_authenticate(
+        &config,
+        &cert_store,
+        &mut cert_rx_opt,
+        &local_clipboard_text,
+        &clipboard_msg_tx,
+        &emit,
+    );
+    // Cancel DNS, TCP, and stalled negotiations promptly when leaving the
+    // session view; an old worker must not connect after the user gives up.
+    let connect_res = tokio::select! {
+        result = connecting => result,
+        _ = async {
+            while let Some(command) = cmd_rx.recv().await {
+                if matches!(command, RdpCommand::Disconnect) { break; }
+                // Preserve input/resize commands received during the handshake.
+                pending_commands.push_back(command);
             }
-        };
-
-        let (connection_result, framed) = match connect_res {
-            Ok(pair) => pair,
-            Err(err_msg) => {
-                emit(RdpWorkerEvent::StageChanged {
-                    profile_id: profile_id.clone(),
-                    stage: SessionStage::Error,
-                    detail: err_msg.clone(),
-                });
-                emit(RdpWorkerEvent::SessionEnded {
-                    profile_id,
-                    reason: err_msg,
-                    is_error: true,
-                });
-                return;
-            }
-        };
-
-        let w = connection_result.desktop_size.width;
-        let h = connection_result.desktop_size.height;
-        if let Ok(mut fb) = framebuffer.lock() {
-            fb.resize_clear(w, h);
+        } => {
+            emit(RdpWorkerEvent::SessionEnded {
+                profile_id,
+                reason: "Connection cancelled".to_string(),
+                is_error: false,
+            });
+            return;
         }
-        emit(RdpWorkerEvent::DesktopResized {
-            width: w,
-            height: h,
-        });
-        emit(RdpWorkerEvent::StageChanged {
-            profile_id: profile_id.clone(),
-            stage: SessionStage::Connected,
-            detail: format!("Connected ({w}×{h})"),
-        });
+    };
 
-        match drive_active_session(
-            framed,
-            connection_result,
-            &framebuffer,
-            &local_clipboard_text,
-            &clipboard_msg_tx,
-            &mut clipboard_msg_rx,
-            &mut cmd_rx,
-            &mut pending_commands,
-            &emit,
-        )
-        .await
-        {
-            Ok(SessionLoopFlow::ReconnectWithNewSize { width, height }) => {
-                config.width = width;
-                config.height = height;
-                emit(RdpWorkerEvent::StageChanged {
-                    profile_id: profile_id.clone(),
-                    stage: SessionStage::Reconnecting,
-                    detail: format!("Resizing desktop to {width}×{height}…"),
-                });
-                continue;
-            }
-            Ok(SessionLoopFlow::TerminatedGracefully(reason)) => {
-                emit(RdpWorkerEvent::StageChanged {
-                    profile_id: profile_id.clone(),
-                    stage: SessionStage::Disconnected,
-                    detail: reason.to_string(),
-                });
-                emit(RdpWorkerEvent::SessionEnded {
-                    profile_id,
-                    reason: reason.to_string(),
-                    is_error: false,
-                });
-                break;
-            }
-            Err(e) => {
-                let msg = format!("RDP session terminated: {e}");
-                emit(RdpWorkerEvent::StageChanged {
-                    profile_id: profile_id.clone(),
-                    stage: SessionStage::Error,
-                    detail: msg.clone(),
-                });
-                emit(RdpWorkerEvent::SessionEnded {
-                    profile_id,
-                    reason: msg,
-                    is_error: true,
-                });
-                break;
-            }
+    let (connection_result, framed) = match connect_res {
+        Ok(pair) => pair,
+        Err(err_msg) => {
+            emit(RdpWorkerEvent::StageChanged {
+                profile_id: profile_id.clone(),
+                stage: SessionStage::Error,
+                detail: err_msg.clone(),
+            });
+            emit(RdpWorkerEvent::SessionEnded {
+                profile_id,
+                reason: err_msg,
+                is_error: true,
+            });
+            return;
+        }
+    };
+
+    let w = connection_result.desktop_size.width;
+    let h = connection_result.desktop_size.height;
+    if let Ok(mut fb) = framebuffer.lock() {
+        fb.resize_clear(w, h);
+    }
+    emit(RdpWorkerEvent::DesktopResized {
+        width: w,
+        height: h,
+    });
+    emit(RdpWorkerEvent::StageChanged {
+        profile_id: profile_id.clone(),
+        stage: SessionStage::Connected,
+        detail: format!("Connected ({w}×{h})"),
+    });
+
+    match drive_active_session(
+        framed,
+        connection_result,
+        &framebuffer,
+        &local_clipboard_text,
+        &clipboard_msg_tx,
+        &mut clipboard_msg_rx,
+        &mut cmd_rx,
+        &mut pending_commands,
+        &emit,
+    )
+    .await
+    {
+        Ok(SessionLoopFlow::TerminatedGracefully(reason)) => {
+            emit(RdpWorkerEvent::StageChanged {
+                profile_id: profile_id.clone(),
+                stage: SessionStage::Disconnected,
+                detail: reason.to_string(),
+            });
+            emit(RdpWorkerEvent::SessionEnded {
+                profile_id,
+                reason: reason.to_string(),
+                is_error: false,
+            });
+        }
+        Err(e) => {
+            let msg = format!("RDP session terminated: {e}");
+            emit(RdpWorkerEvent::StageChanged {
+                profile_id: profile_id.clone(),
+                stage: SessionStage::Error,
+                detail: msg.clone(),
+            });
+            emit(RdpWorkerEvent::SessionEnded {
+                profile_id,
+                reason: msg,
+                is_error: true,
+            });
         }
     }
 }
@@ -800,7 +786,6 @@ fn build_client_connector(
 }
 
 enum SessionLoopFlow {
-    ReconnectWithNewSize { width: u16, height: u16 },
     TerminatedGracefully(GracefulDisconnectReason),
 }
 
@@ -819,6 +804,7 @@ async fn drive_active_session(
     let desktop_size = connection_result.desktop_size;
     let mut image = DecodedImage::new(PixelFormat::RgbA32, desktop_size.width, desktop_size.height);
     let activation_factory = connection_result.activation_factory;
+    let compression_type = connection_result.compression_type;
 
     let mut active_stage = ActiveStageBuilder {
         static_channels: connection_result.static_channels,
@@ -835,6 +821,7 @@ async fn drive_active_session(
     let mut frames_in_window = 0u32;
     let mut fps_window_start = tokio::time::Instant::now();
     let mut current_fps = 30u32;
+    let mut display_resize = DisplayResize::default();
 
     let reason = 'outer: loop {
         let outputs = tokio::select! {
@@ -863,15 +850,8 @@ async fn drive_active_session(
                         active_stage.process_fastpath_input(&mut image, &events)?
                     }
                     RdpCommand::ResizeDesktop { width, height, scale_factor } => {
-                        let (adj_w, adj_h) = MonitorLayoutEntry::adjust_display_size(u32::from(width), u32::from(height));
-                        if let Some(res_frame) = active_stage.encode_resize(adj_w, adj_h, Some(scale_factor), None) {
-                            vec![ActiveStageOutput::ResponseFrame(res_frame?)]
-                        } else {
-                            return Ok(SessionLoopFlow::ReconnectWithNewSize {
-                                width: u16::try_from(adj_w).unwrap_or(1280),
-                                height: u16::try_from(adj_h).unwrap_or(720),
-                            });
-                        }
+                        display_resize.request(width, height, scale_factor);
+                        Vec::new()
                     }
                     RdpCommand::SetLocalClipboardText(text) => {
                         if let Ok(mut guard) = local_clipboard_text.lock() {
@@ -978,7 +958,7 @@ async fn drive_active_session(
                                     share_id,
                                     enable_server_pointer,
                                     pointer_software_rendering,
-                                    bulk_decompressor: None,
+                                    bulk_decompressor: crate::rdp::display_resize::bulk_decompressor(compression_type)?,
                                 }
                                 .build(),
                             );
@@ -992,6 +972,12 @@ async fn drive_active_session(
                 ActiveStageOutput::MultitransportRequest(_) | ActiveStageOutput::AutoDetect(_) => {}
             }
         }
+        if let Some(frame) = display_resize.frame(&mut active_stage) {
+            writer.write_all(&frame).await.map_err(|e| {
+                ironrdp_session::custom_err!("write display resize", e)
+            })?;
+        }
+
     };
 
     Ok(SessionLoopFlow::TerminatedGracefully(reason))

@@ -26,6 +26,13 @@ Item {
             verify(field.inputMethodHints & Qt.ImhNoAutoUppercase)
         }
 
+        function test_direct_touch_default_preserves_explicit_trackpad_choice() {
+            editor.openForNew()
+            compare(editor.defaultTouchMode, "direct_touch")
+            editor.openForEdit({ id: "old-pc", hostname: "host", defaultTouchMode: "mouse_pointer" })
+            compare(editor.defaultTouchMode, "mouse_pointer")
+        }
+
         function test_save_literal_address_data() {
             return [
                 { tag: "hyphen", address: "hostname-01" },

@@ -114,7 +114,7 @@ pub enum TouchInputMode {
 
 impl Default for TouchInputMode {
     fn default() -> Self {
-        Self::MousePointer
+        Self::DirectTouch
     }
 }
 
@@ -122,7 +122,8 @@ impl TouchInputMode {
     pub fn from_key(key: &str) -> Self {
         match key {
             "direct" | "direct_touch" => Self::DirectTouch,
-            _ => Self::MousePointer,
+            "mouse_pointer" => Self::MousePointer,
+            _ => Self::default(),
         }
     }
 
@@ -145,6 +146,7 @@ pub struct PcProfile {
     pub scale_factor: u32,
     pub clipboard_redirection: bool,
     pub audio_mode: AudioRedirectionMode,
+    #[serde(default)]
     pub default_touch_mode: TouchInputMode,
     pub enable_nla: bool,
     pub enable_tls: bool,
@@ -167,7 +169,7 @@ impl PcProfile {
             scale_factor: 100,
             clipboard_redirection: true,
             audio_mode: AudioRedirectionMode::PlayOnDevice,
-            default_touch_mode: TouchInputMode::MousePointer,
+            default_touch_mode: TouchInputMode::default(),
             enable_nla: true,
             enable_tls: true,
             group_name: "Saved PCs".to_string(),
