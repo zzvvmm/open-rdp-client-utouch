@@ -1,5 +1,6 @@
-use core::net::{IpAddr, Ipv4Addr};
+use core::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use core::time::Duration;
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -45,6 +46,7 @@ use crate::models::AudioRedirectionMode;
 use crate::rdp::audio::{PcmAudioChunk, UtRdpsndHandler};
 use crate::rdp::canvas_item::{DirtyRect, SharedFrameBuffer};
 use crate::rdp::clipboard::UtClipboardBackend;
+use crate::rdp::transport;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -241,18 +243,37 @@ async fn run_session_lifecycle(
 
     let mut cert_rx_opt = Some(cert_rx);
     let local_clipboard_text = Arc::new(Mutex::new(String::new()));
+    let mut pending_commands = VecDeque::new();
 
     loop {
         let (clipboard_msg_tx, mut clipboard_msg_rx) = mpsc::unbounded_channel();
-        let connect_res = connect_and_authenticate(
+        let connecting = connect_and_authenticate(
             &config,
             &cert_store,
             &mut cert_rx_opt,
             &local_clipboard_text,
             &clipboard_msg_tx,
             &emit,
-        )
-        .await;
+        );
+        // Cancel DNS, TCP, and stalled negotiations promptly when leaving the
+        // session view; an old worker must not connect after the user gives up.
+        let connect_res = tokio::select! {
+            result = connecting => result,
+            _ = async {
+                while let Some(command) = cmd_rx.recv().await {
+                    if matches!(command, RdpCommand::Disconnect) { break; }
+                    // Preserve input/resize commands received during the handshake.
+                    pending_commands.push_back(command);
+                }
+            } => {
+                emit(RdpWorkerEvent::SessionEnded {
+                    profile_id,
+                    reason: "Connection cancelled".to_string(),
+                    is_error: false,
+                });
+                return;
+            }
+        };
 
         let (connection_result, framed) = match connect_res {
             Ok(pair) => pair,
@@ -294,6 +315,7 @@ async fn run_session_lifecycle(
             &clipboard_msg_tx,
             &mut clipboard_msg_rx,
             &mut cmd_rx,
+            &mut pending_commands,
             &emit,
         )
         .await
@@ -560,11 +582,12 @@ async fn connect_and_authenticate(
         detail: format!("Resolving {}:{}…", config.hostname, config.port),
     });
 
-    let dest = if config.hostname.contains(':') {
-        format!("[{}]:{}", config.hostname, config.port)
-    } else {
-        format!("{}:{}", config.hostname, config.port)
-    };
+    let addresses = transport::resolve(&config.hostname, config.port).await?;
+    let dest = addresses
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(", ");
 
     emit(RdpWorkerEvent::StageChanged {
         profile_id: profile_id.clone(),
@@ -572,10 +595,7 @@ async fn connect_and_authenticate(
         detail: format!("Connecting to {dest}…"),
     });
 
-    let stream = tokio::time::timeout(Duration::from_secs(12), TcpStream::connect(&dest))
-        .await
-        .map_err(|_| format!("Connection timed out reaching {dest}"))?
-        .map_err(|e| format!("TCP connection to {dest} failed: {e}"))?;
+    let stream = transport::connect(addresses).await?;
 
     let _ = stream.set_nodelay(true);
     let client_addr = stream
@@ -591,8 +611,12 @@ async fn connect_and_authenticate(
         emit,
     )?;
 
-    let should_upgrade = ironrdp_tokio::connect_begin(&mut framed, &mut connector)
+    let should_upgrade = tokio::time::timeout(
+        Duration::from_secs(20),
+        ironrdp_tokio::connect_begin(&mut framed, &mut connector),
+    )
         .await
+        .map_err(|_| "RDP negotiation timed out after TCP connected. Check the RDP port and server; over VPN, also check tunnel MTU and packet filtering.".to_string())?
         .map_err(|e| format!("RDP negotiation failed: {e}"))?;
 
     emit(RdpWorkerEvent::StageChanged {
@@ -602,8 +626,12 @@ async fn connect_and_authenticate(
     });
 
     let (initial_stream, leftover_bytes) = framed.into_inner();
-    let (tls_stream, tls_cert) = ironrdp_tls::upgrade(initial_stream, &config.hostname)
+    let (tls_stream, tls_cert) = tokio::time::timeout(
+        Duration::from_secs(20),
+        ironrdp_tls::upgrade(initial_stream, &config.hostname),
+    )
         .await
+        .map_err(|_| "TLS handshake timed out after TCP connected. Check the server; over VPN, also check tunnel MTU and packet filtering.".to_string())?
         .map_err(|e| format!("TLS handshake failed: {e}"))?;
 
     // Inspect server certificate & enforce TOFU before sending NLA credentials
@@ -664,7 +692,7 @@ async fn connect_and_authenticate(
     let mut net_client = TokioNetworkClient;
     let server_name = RdpServerName::new(&config.hostname);
 
-    let connection_result = ironrdp_tokio::connect_finalize(
+    let connection_result = tokio::time::timeout(Duration::from_secs(45), ironrdp_tokio::connect_finalize(
         upgraded,
         connector,
         &mut upgraded_framed,
@@ -672,8 +700,9 @@ async fn connect_and_authenticate(
         server_name,
         server_public_key,
         None,
-    )
+    ))
     .await
+    .map_err(|_| "Authentication / session activation timed out. Check the server and domain connectivity; over VPN, also check tunnel MTU and packet filtering.".to_string())?
     .map_err(|e| format!("Authentication / session activation failed: {e}"))?;
 
     Ok((connection_result, upgraded_framed))
@@ -783,6 +812,7 @@ async fn drive_active_session(
     clipboard_msg_tx: &mpsc::UnboundedSender<ClipboardMessage>,
     clipboard_msg_rx: &mut mpsc::UnboundedReceiver<ClipboardMessage>,
     cmd_rx: &mut mpsc::UnboundedReceiver<RdpCommand>,
+    pending_commands: &mut VecDeque<RdpCommand>,
     emit: &Arc<dyn Fn(RdpWorkerEvent) + Send + Sync + 'static>,
 ) -> SessionResult<SessionLoopFlow> {
     let (mut reader, mut writer) = split_tokio_framed(framed);
@@ -815,7 +845,13 @@ async fn drive_active_session(
             Some(clip_msg) = clipboard_msg_rx.recv() => {
                 process_clipboard_message(&mut active_stage, clip_msg)?
             }
-            cmd = cmd_rx.recv() => {
+            cmd = async {
+                if let Some(command) = pending_commands.pop_front() {
+                    Some(command)
+                } else {
+                    cmd_rx.recv().await
+                }
+            } => {
                 let Some(cmd) = cmd else {
                     break 'outer GracefulDisconnectReason::UserInitiated;
                 };
@@ -1048,26 +1084,138 @@ async fn send_kdc_tcp(url: &Url, data: &[u8]) -> ConnectorResult<Vec<u8>> {
 }
 
 async fn send_kdc_udp(url: &Url, data: &[u8]) -> ConnectorResult<Vec<u8>> {
-    let udp_socket = UdpSocket::bind((IpAddr::V4(Ipv4Addr::LOCALHOST), 0))
+    let host = url
+        .host_str()
+        .unwrap_or_default()
+        .trim_start_matches('[')
+        .trim_end_matches(']');
+    let addresses = transport::resolve(host, url.port().unwrap_or(88))
         .await
-        .map_err(|e| custom_err!("KDC UDP bind", e))?;
-    let addr = format!(
-        "{}:{}",
-        url.host_str().unwrap_or_default(),
-        url.port().unwrap_or(88)
-    );
-    udp_socket
-        .send_to(data, addr)
+        .map_err(|e| custom_err!("KDC UDP DNS", std::io::Error::other(e)))?;
+    let mut last_error = std::io::Error::other("no reachable KDC UDP address");
+    for address in addresses {
+        let result = tokio::time::timeout(Duration::from_secs(5), async {
+            // Loopback binding prevented remote/domain authentication. Let the
+            // system select the LAN/VPN source address, in the destination family.
+            let bind_ip = if address.is_ipv6() {
+                IpAddr::V6(Ipv6Addr::UNSPECIFIED)
+            } else {
+                IpAddr::V4(Ipv4Addr::UNSPECIFIED)
+            };
+            let socket = UdpSocket::bind((bind_ip, 0)).await?;
+            // Connected UDP accepts replies only from this KDC endpoint.
+            socket.connect(address).await?;
+            socket.send(data).await?;
+            let mut buf = vec![0u8; 48_000];
+            let n = socket.recv(&mut buf).await?;
+            let mut reply = Vec::with_capacity(n + 4);
+            reply.extend_from_slice(&(n as u32).to_be_bytes());
+            reply.extend_from_slice(&buf[..n]);
+            Ok::<_, std::io::Error>(reply)
+        })
+        .await;
+        match result {
+            Ok(Ok(reply)) => return Ok(reply),
+            Ok(Err(error)) => last_error = error,
+            Err(_) => {
+                last_error = std::io::Error::new(
+                    std::io::ErrorKind::TimedOut,
+                    format!("KDC UDP {address} timed out"),
+                )
+            }
+        }
+    }
+    Err(custom_err!("KDC UDP exchange", last_error))
+}
+
+#[cfg(test)]
+mod connection_tests {
+    use super::*;
+    use tokio::net::TcpListener;
+
+    #[tokio::test]
+    async fn cancel_stops_a_worker_while_server_stalls_negotiation() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let config = RdpSessionConfig {
+            profile_id: "cancel-test".to_string(),
+            friendly_name: "Test".to_string(),
+            hostname: "127.0.0.1".to_string(),
+            port: listener.local_addr().unwrap().port(),
+            username: "test".to_string(),
+            password: String::new(),
+            domain: String::new(),
+            width: 800,
+            height: 600,
+            scale_factor: 100,
+            enable_tls: true,
+            enable_nla: true,
+            clipboard_redirection: false,
+            audio_mode: AudioRedirectionMode::Disabled,
+            temp_dir: String::new(),
+        };
+        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
+        let (_cert_tx, cert_rx) = oneshot::channel();
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let captured = Arc::clone(&events);
+        let worker = run_session_lifecycle(
+            config,
+            SharedFrameBuffer::new_shared(800, 600),
+            Arc::new(Mutex::new(CertStore::default())),
+            cmd_rx,
+            cert_rx,
+            Arc::new(move |event| captured.lock().unwrap().push(event)),
+        );
+        let cancel_after_request = async {
+            let (mut peer, _) = listener.accept().await.unwrap();
+            let mut request = [0; 512];
+            peer.read(&mut request).await.unwrap();
+            cmd_tx.send(RdpCommand::Disconnect).unwrap();
+            // Keep the peer open, so only cancellation can finish the worker.
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        };
+        tokio::time::timeout(Duration::from_secs(2), async {
+            tokio::join!(worker, cancel_after_request);
+        })
         .await
-        .map_err(|e| custom_err!("KDC UDP send", e))?;
-    let mut buf = vec![0u8; 48_000];
-    let n = udp_socket
-        .recv(&mut buf)
-        .await
-        .map_err(|e| custom_err!("KDC UDP recv", e))?;
-    let n_u32 = u32::try_from(n).map_err(|e| custom_err!("KDC UDP len", e))?;
-    let mut reply = Vec::with_capacity(n + 4);
-    reply.extend_from_slice(&n_u32.to_be_bytes());
-    reply.extend_from_slice(&buf[0..n]);
-    Ok(reply)
+        .expect("cancel must interrupt negotiation");
+        assert!(matches!(
+            events.lock().unwrap().last(),
+            Some(RdpWorkerEvent::SessionEnded {
+                is_error: false,
+                ..
+            })
+        ));
+    }
+
+    #[tokio::test]
+    async fn kdc_udp_supports_ipv6_and_non_loopback_routes() {
+        // Discover this machine's routed address without sending any packets.
+        // A loopback-only socket would fail to reach the fake KDC on that address.
+        let route = std::net::UdpSocket::bind("0.0.0.0:0").unwrap();
+        route.connect("192.0.2.1:88").unwrap();
+        let routed_ip = route.local_addr().unwrap().ip();
+        assert!(!routed_ip.is_loopback());
+        for ip in [routed_ip, IpAddr::V6(Ipv6Addr::LOCALHOST)] {
+            let server = UdpSocket::bind((ip, 0)).await.unwrap();
+            let address = server.local_addr().unwrap();
+            let response = tokio::spawn(async move {
+                let mut request = [0; 128];
+                let (length, source) = server.recv_from(&mut request).await.unwrap();
+                assert_eq!(&request[..length], b"kerberos request");
+                assert_eq!(source.ip().is_loopback(), ip.is_loopback());
+                server.send_to(b"test response", source).await.unwrap();
+            });
+            let url = Url::parse(&format!("udp://{address}")).unwrap();
+            let result = tokio::time::timeout(
+                Duration::from_secs(2),
+                send_kdc_udp(&url, b"kerberos request"),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+            assert_eq!(&result[..4], &(13u32).to_be_bytes());
+            assert_eq!(&result[4..], b"test response");
+            response.await.unwrap();
+        }
+    }
 }

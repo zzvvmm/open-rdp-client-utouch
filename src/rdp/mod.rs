@@ -3,6 +3,7 @@ pub mod canvas_item;
 pub mod clipboard;
 pub mod input_mapper;
 pub mod session_worker;
+mod transport;
 
 pub use audio::{PcmAudioChunk, UtRdpsndHandler};
 pub use canvas_item::{DirtyRect, SharedFrameBuffer};
