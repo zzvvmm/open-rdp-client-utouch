@@ -19,12 +19,12 @@ For hostname, connection, and WireGuard VPN problems, see
   - Pure-Rust **IronRDP** (`ironrdp-connector`, `ironrdp-session`, `ironrdp-tokio`, `ironrdp-tls`) running on a dedicated `tokio` worker thread.
   - **CredSSP / NLA (Network Level Authentication)** with `DOMAIN\username` and UPN support.
   - **Trust-On-First-Use (TOFU) Certificate Verification (`CertPromptDialog.qml`)**: Inspects X.509 Common Name, Issuer, Validity dates, and SHA-256 fingerprint before sending NLA credentials, and alerts on fingerprint mismatches.
-  - **Dynamic Display Resize (`DISP` DVC Channel)**: Automatically resizes the remote Windows desktop when rotating the device or resizing the window in Lomiri Convergence mode.
+  - **Dynamic Display Resize (`DISP` DVC Channel)**: Resizes dynamic-resolution desktops when the server's display channel is ready. Rotation keeps the session open and fits the existing desktop when resizing is unavailable; fixed-resolution profiles keep their selected size.
   - **Bidirectional Clipboard Redirection (`CLIPRDR`)**: Syncs Unicode text (`CF_UNICODETEXT` / `CF_TEXT`) between Ubuntu Touch and the remote Windows session.
   - **Audio Output Redirection (`RDPSND`)**: Streams 44.1 kHz / 48 kHz 16-bit stereo PCM audio from the remote PC to Ubuntu Touch via `QtMultimedia`.
 - **Touchscreen Ergonomics Built for Mobile (`VirtualTrackpad.qml` & `VirtualKeyBar.qml`)**
   - **Mouse Pointer (Virtual Trackpad) Mode**: Relative trackpad movement with configurable speed, 1-finger tap left-click, double-tap, long-press drag selection, 2-finger tap right-click, and 2-finger scroll wheel.
-  - **Direct Touch Mode**: Tap directly at remote coordinates, drag to move windows or select text, and press-and-hold to right-click with a visual indicator.
+  - **Direct Touch Mode (default for new PCs)**: Tap directly at remote coordinates, drag to move windows or select text, and press-and-hold to right-click with a visual indicator. Saved input-mode choices are preserved.
   - **Explicit Mouse Controls**: Dedicated left-click, right-click, double-click, drag lock, and precision pointer controls. Gesture cancellation releases held buttons.
   - **Zoom & Cursor-Following Pan (`RdpViewport.qml`)**: Quick `100%` / `150%` / `200%` zoom; in trackpad mode the viewport follows the pointer without stealing remote drag gestures.
   - **Hardware Mouse & Keyboard**: Absolute mouse positioning, all three mouse buttons, dragging, wheel input, and hardware keyboard shortcuts. Navigation keys are sent with matching releases.
@@ -48,7 +48,7 @@ These controls work with Windows and Linux desktops, including Ubuntu/XFCE:
 - **Move windows or select text:** Position the pointer on the title bar or selection start, tap **Drag**, and swipe as many times as needed. Tap **Release** to drop. The held button is also released when leaving the session or switching input modes.
 - **Direct touch:** Tap the target to click, drag a finger to move a window or select text, and hold still to open its context menu. Touches in the black border are ignored.
 - **Zoom:** Use the floating session menu to switch between 100%, 150%, and 200%. In trackpad mode, move the pointer towards an edge to reveal that part of the desktop. Use 100% to return to the full desktop.
-- **On-screen keyboard:** Hidden by default. Tap either keyboard button to open or hide it without hiding the extra key bar. After dismissing it, pointer actions and shortcuts do not reopen it. Leaving the session or backgrounding the app also hides it; returning does not reopen it automatically.
+- **On-screen keyboard:** Hidden by default. Tap either keyboard button to open or hide it. The virtual key bar stays visible above the keyboard in portrait and landscape. After dismissing it, pointer actions and shortcuts do not reopen it. Leaving the session or backgrounding the app also hides it; returning does not reopen it automatically.
 - **Typing and shortcuts:** A hardware keyboard works without opening the on-screen keyboard. The **Shortcuts** menu includes Copy/Paste/Select all, `Ctrl+Alt+T`, `Alt+F2`, `Alt+F4`, `Ctrl+Alt+D`, and terminal-friendly `Ctrl+Shift+C` / `Ctrl+Shift+V`. Their effects depend on the remote desktop's configured key bindings. The same combinations can be sent from a hardware keyboard when delivered to the app.
 
 ---

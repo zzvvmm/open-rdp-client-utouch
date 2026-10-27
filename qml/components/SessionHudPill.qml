@@ -5,7 +5,7 @@ Item {
     id: root
 
     property string pcTitle: "Remote PC"
-    property string touchMode: "mouse_pointer"
+    property string touchMode: "direct_touch"
     property bool keyboardVisible: false
     property real zoomFactor: 1.0
     property int currentFps: 60

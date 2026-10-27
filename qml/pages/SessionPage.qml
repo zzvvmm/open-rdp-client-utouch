@@ -8,7 +8,9 @@ Item {
     property string pcTitle: "Remote PC"
     property string sessionStage: "disconnected"
     property string stageDetail: ""
-    property string touchMode: "mouse_pointer"
+    property string touchMode: "direct_touch"
+    property bool dynamicResolution: true
+    property int desktopScaleFactor: 100
     property int remoteWidth: 1280
     property int remoteHeight: 720
     property int cursorX: 640
@@ -20,7 +22,6 @@ Item {
     property string shiftState: "off"
     property string winState: "off"
     property var pendingCert: null
-    property bool keyBarVisible: true
     property bool dragLocked: false
     property bool precisionMode: false
 
@@ -51,7 +52,10 @@ Item {
     }
     onSessionStageChanged: {
         if (sessionStage !== "connected") releasePointer()
-        else restoreKeyboardFocus()
+        else {
+            restoreKeyboardFocus()
+            resizeDebounce.restart()
+        }
     }
     onPendingCertChanged: {
         if (pendingCert !== null) releasePointer()
@@ -74,23 +78,25 @@ Item {
         interval: 350
         repeat: false
         onTriggered: {
-            if (root.sessionStage === "connected" && viewport.width >= 320 && viewport.height >= 240) {
+            if (root.visible && root.sessionStage === "connected" && root.dynamicResolution
+                    && viewport.width >= 320 && viewport.height >= 240) {
                 root.dispatchAction({
                     action: "resize_session",
                     width: Math.round(viewport.width),
                     height: Math.round(viewport.height),
-                    scaleFactor: 100
+                    scaleFactor: root.desktopScaleFactor
                 })
             }
         }
     }
 
-    onWidthChanged: resizeDebounce.restart()
-    onHeightChanged: resizeDebounce.restart()
+    onWidthChanged: { releasePointer(); resizeDebounce.restart() }
+    onHeightChanged: { releasePointer(); resizeDebounce.restart() }
 
     // Hidden input to summon Lomiri OSK and capture hardware/OSK keyboard input
     RemoteKeyboard {
         id: oskInput
+        objectName: "sessionKeyboard"
         enabled: root.visible && root.sessionStage === "connected" && root.pendingCert === null
         focus: enabled
         onDispatchAction: root.dispatchAction(payload)
@@ -99,6 +105,7 @@ Item {
     // Remote Desktop Canvas Viewport
     RdpViewport {
         id: viewport
+        objectName: "sessionViewport"
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
@@ -209,7 +216,7 @@ Item {
         height: visible ? units.gu(5.6) : 0
         anchors.left: parent.left
         anchors.right: parent.right
-        anchors.bottom: vKeyBar.visible ? vKeyBar.top : parent.bottom
+        anchors.bottom: vKeyBar.top
         dragLocked: root.dragLocked
         precisionMode: root.precisionMode
 
@@ -233,7 +240,8 @@ Item {
     // Extended Modifier & Function Key Bar
     VirtualKeyBar {
         id: vKeyBar
-        visible: root.keyBarVisible
+        objectName: "sessionVirtualKeyBar"
+        enabled: root.sessionStage === "connected" && root.pendingCert === null
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom

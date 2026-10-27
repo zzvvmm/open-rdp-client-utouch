@@ -19,6 +19,7 @@ pub struct AppSettings {
     pub theme_mode: String, // "dark", "light", "system"
     pub default_resolution: ResolutionMode,
     pub default_scale_factor: u32,
+    #[serde(default)]
     pub default_touch_mode: TouchInputMode,
     pub default_audio_mode: AudioRedirectionMode,
     pub default_clipboard_enabled: bool,
@@ -39,7 +40,7 @@ impl Default for AppSettings {
             theme_mode: "dark".to_string(),
             default_resolution: ResolutionMode::Dynamic,
             default_scale_factor: 100,
-            default_touch_mode: TouchInputMode::MousePointer,
+            default_touch_mode: TouchInputMode::default(),
             default_audio_mode: AudioRedirectionMode::PlayOnDevice,
             default_clipboard_enabled: true,
             trackpad_speed_percent: 100,
@@ -155,6 +156,21 @@ impl StorageDatabase {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn touch_defaults_preserve_saved_trackpad_choices() {
+        assert_eq!(AppSettings::default().default_touch_mode, TouchInputMode::DirectTouch);
+        let mut settings = serde_json::to_value(AppSettings::default()).unwrap();
+        settings.as_object_mut().unwrap().remove("default_touch_mode");
+        assert_eq!(serde_json::from_value::<AppSettings>(settings.clone()).unwrap().default_touch_mode, TouchInputMode::DirectTouch);
+        settings["default_touch_mode"] = serde_json::json!("mouse_pointer");
+        assert_eq!(serde_json::from_value::<AppSettings>(settings).unwrap().default_touch_mode, TouchInputMode::MousePointer);
+        let profile = PcProfile::new("host-01", "").unwrap();
+        assert_eq!(profile.default_touch_mode, TouchInputMode::DirectTouch);
+        let mut saved = serde_json::to_value(profile).unwrap();
+        saved["default_touch_mode"] = serde_json::json!("mouse_pointer");
+        assert_eq!(serde_json::from_value::<PcProfile>(saved).unwrap().default_touch_mode, TouchInputMode::MousePointer);
+    }
 
     #[test]
     fn legacy_settings_keep_preferences_and_enable_update_checks() {

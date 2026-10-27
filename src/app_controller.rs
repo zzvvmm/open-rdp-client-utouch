@@ -511,7 +511,7 @@ impl AppController {
         let default_touch_mode = TouchInputMode::from_key(
             v.get("defaultTouchMode")
                 .and_then(Value::as_str)
-                .unwrap_or("mouse_pointer"),
+                .unwrap_or("direct_touch"),
         );
         let enable_nla = v.get("enableNla").and_then(Value::as_bool).unwrap_or(true);
         let enable_tls = v.get("enableTls").and_then(Value::as_bool).unwrap_or(true);

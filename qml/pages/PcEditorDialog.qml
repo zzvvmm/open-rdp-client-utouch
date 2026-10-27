@@ -15,7 +15,7 @@ Rectangle {
     property string accountId: ""
     property string resolutionPreset: "dynamic"
     property int scaleFactor: 100
-    property string defaultTouchMode: "mouse_pointer"
+    property string defaultTouchMode: "direct_touch"
     property string audioMode: "play_on_device"
     property bool clipboardRedirection: true
     property bool enableNla: true
@@ -32,7 +32,7 @@ Rectangle {
         accountId = ""
         resolutionPreset = defaultRes || "dynamic"
         scaleFactor = defaultScale || 100
-        defaultTouchMode = defaultTouch || "mouse_pointer"
+        defaultTouchMode = defaultTouch || "direct_touch"
         audioMode = defaultAudio || "play_on_device"
         clipboardRedirection = (defaultClip !== undefined) ? defaultClip : true
         enableNla = true
@@ -48,7 +48,7 @@ Rectangle {
         accountId = pc.accountId || ""
         resolutionPreset = pc.resolutionPreset || "dynamic"
         scaleFactor = pc.scaleFactor || 100
-        defaultTouchMode = pc.defaultTouchMode || "mouse_pointer"
+        defaultTouchMode = pc.defaultTouchMode || "direct_touch"
         audioMode = pc.audioMode || "play_on_device"
         clipboardRedirection = (pc.clipboardRedirection !== undefined) ? pc.clipboardRedirection : true
         enableNla = (pc.enableNla !== undefined) ? pc.enableNla : true

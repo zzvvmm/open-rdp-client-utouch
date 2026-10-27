@@ -5,7 +5,7 @@ import RdpClient 1.0
 Item {
     id: root
 
-    property string touchMode: "mouse_pointer"
+    property string touchMode: "direct_touch"
     property int remoteWidth: 1280
     property int remoteHeight: 720
     property int cursorX: 640

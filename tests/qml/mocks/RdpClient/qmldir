@@ -1,0 +1,3 @@
+module RdpClient
+RdpCanvas 1.0 RdpCanvas.qml
+singleton RdpBridge 1.0 RdpBridge.qml
