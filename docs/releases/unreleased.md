@@ -10,6 +10,10 @@
   profiles retain their selected size, and resize requests preserve display scale.
 - Restore negotiated bulk decompression after in-place desktop reactivation so
   compressed screen updates remain readable following a server resize.
+- Ignore unrecognized Fast-Path update codes while preserving subsequent
+  updates, so an unsupported graphics update does not terminate the session.
+- Handle xrdp's abbreviated Server Deactivate All message as a display
+  reactivation instead of terminating with a short-header decode error.
 - Disable keyboard prediction and automatic capitalization in the PC address
   field, and commit pending keyboard input before saving, to prevent address
   rewriting or lost suffixes such as `-01`.
@@ -30,16 +34,17 @@ The earlier address/VPN fixes passed 28 Rust tests, 58 QML checks, and package
 review for both architectures. The IPv6-saving and Kerberos UDP regression tests
 also failed against the old implementations in an isolated source copy.
 
-The touch/rotation changes pass 32 Rust tests and 65 QML checks. Both amd64 and
-arm64 packages built and passed Clickable review. Resize tests
-exercise real protocol encoding with simulated channel setup/capabilities; QML
-session layout tests use a canvas stub. A native full-app demo stayed connected
-through portrait, landscape, reduced keyboard space, and a return to portrait,
-with the key bar visible throughout. A local xrdp connection authenticated but
-failed with a display-decoder error before rotation; it did not validate live
-server rotation. A physical-device rotation test against a real RDP server is
-still needed.
+The touch/rotation changes passed 32 Rust tests and 65 QML checks. Both amd64
+and arm64 packages built and passed Clickable review at the earlier candidate
+revision. Resize tests exercise protocol encoding with simulated channel
+setup/capabilities; QML session layout tests use a canvas stub. A native
+full-app demo stayed connected through portrait, landscape, reduced keyboard
+space, and a return to portrait, with the key bar visible throughout. The
+physical-device test verified rotation, keyboard and key-bar behavior, and
+VPN/domain authentication against a real RDP server.
 
-These changes are not published yet. The reported WireGuard setup and Ubuntu
-Touch software keyboard still need validation on a physical device; local
-transport checks do not prove a complete RDP/domain login or VPN session.
+A local xrdp connection authenticated but then failed while decoding a
+Fast-Path update before the desktop appeared. Regression tests now cover
+ignoring unknown update codes while retaining frame boundaries and payload
+bytes; this decoder change still needs validation against xrdp on a device.
+Packages must be rebuilt and reviewed for the updated source before release.
