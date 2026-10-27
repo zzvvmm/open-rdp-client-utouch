@@ -4,6 +4,8 @@
 
 For the development workflow, version bumps, and releases to GitHub and OpenStore,
 see the [development and release guide](docs/RELEASING.md).
+For hostname, connection, and WireGuard VPN problems, see
+[connection troubleshooting](docs/TROUBLESHOOTING.md).
 
 ---
 

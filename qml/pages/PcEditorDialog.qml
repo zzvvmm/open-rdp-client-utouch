@@ -134,9 +134,13 @@ Rectangle {
                         color: root.darkMode ? "#9BA7B8" : "#5A6577"
                     }
                     TextField {
+                        id: hostField
+                        objectName: "pcHostField"
                         width: parent.width
                         text: root.hostInput
                         placeholderText: "e.g. 192.168.1.50 or work-pc.local:3389"
+                        // Addresses are literal input, not words for the keyboard to correct.
+                        inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
                         onTextChanged: root.hostInput = text
                     }
 
@@ -311,11 +315,14 @@ Rectangle {
                 spacing: units.gu(1.2)
 
                 Button {
+                    objectName: "savePcButton"
                     width: parent.width
                     height: units.gu(4.5)
                     text: root.editId.length > 0 ? i18n.tr("Save Changes") : i18n.tr("Save PC")
                     color: "#0078D4"
                     onClicked: {
+                        // Include the keyboard's pending composition before reading the form.
+                        Qt.inputMethod.commit()
                         if (root.hostInput.trim().length === 0) {
                             root.validationError = i18n.tr("Please enter a hostname or IP address.")
                             return

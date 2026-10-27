@@ -546,7 +546,9 @@ impl AppController {
                 pc.group_name = group_name;
             }
         } else {
-            let mut pc = PcProfile::new(&format!("{hostname}:{port}"), &friendly_name)?;
+            // Reuse the original input: reconstructing an unbracketed IPv6 address
+            // with a port would turn that port into part of the saved hostname.
+            let mut pc = PcProfile::new(host_input, &friendly_name)?;
             pc.account_id = account_id;
             pc.resolution_mode = resolution_mode;
             pc.scale_factor = scale_factor;
@@ -1038,6 +1040,53 @@ impl AppController {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn saving_and_editing_preserves_hostnames_ipv6_and_ports_on_disk() {
+        let dir = tempdir().unwrap();
+        let db =
+            StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
+        let vault = CredentialVault::open_at(dir.path().join("vault")).unwrap();
+        let ctrl = AppController::new(db.clone(), vault, Arc::new(|_, _| {}));
+        for (input, host, port) in [
+            ("hostname-01", "hostname-01", 3389),
+            (
+                "Hostname-01.example.test:3390",
+                "Hostname-01.example.test",
+                3390,
+            ),
+            ("192.168.1.50:3391", "192.168.1.50", 3391),
+            ("[fd00::1234]:3392", "fd00::1234", 3392),
+            ("fd00::1234", "fd00::1234", 3389),
+            ("[fd00::1234]", "fd00::1234", 3389),
+        ] {
+            ctrl.dispatch_action(&json!({"action": "save_pc", "hostInput": input}).to_string())
+                .unwrap();
+            let profiles = db.load_profiles();
+            let saved = profiles.last().unwrap();
+            assert_eq!(saved.hostname, host, "saved {input}");
+            assert_eq!(saved.port, port, "saved {input}");
+            assert_eq!(
+                parse_host_port(&saved.address_string()).unwrap(),
+                (host.to_string(), port)
+            );
+            ctrl.dispatch_action(
+                &json!({"action": "save_pc", "id": saved.id, "hostInput": "office-pc-02:3393"})
+                    .to_string(),
+            )
+            .unwrap();
+            let edited = db
+                .load_profiles()
+                .into_iter()
+                .find(|p| p.id == saved.id)
+                .unwrap();
+            assert_eq!(edited.hostname, "office-pc-02");
+            assert_eq!(edited.port, 3393);
+        }
+        let reopened =
+            StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
+        assert_eq!(reopened.load_profiles(), db.load_profiles());
+    }
 
     #[test]
     fn update_preferences_are_exposed_and_other_setting_patches_preserve_them() {
