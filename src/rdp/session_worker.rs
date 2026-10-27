@@ -844,6 +844,22 @@ async fn drive_active_session(
                 ) {
                     Ok(outputs) => outputs,
                     Err(error) => {
+                        if action_name == "x224" {
+                            if let Ok(data_ctx) =
+                                ironrdp_pdu::mcs::decode_send_data_indication(&payload)
+                            {
+                                if data_ctx.user_data.len() < 10 {
+                                    let prefix_len = data_ctx.user_data.len().min(6);
+                                    tracing::error!(
+                                        channel_id = data_ctx.channel_id,
+                                        user_data_len = data_ctx.user_data.len(),
+                                        user_data_prefix =
+                                            %hex::encode(&data_ctx.user_data[..prefix_len]),
+                                        "Received short X.224 MCS user-data payload"
+                                    );
+                                }
+                            }
+                        }
                         tracing::error!(
                             action = action_name,
                             payload_len = payload.len(),
