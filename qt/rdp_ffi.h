@@ -28,5 +28,6 @@ int rdp_app_copy_framebuffer_rgba(
     std::size_t dst_capacity
 );
 void rdp_app_destroy(RdpAppHandle *handle);
+void rdp_report_ui_error(const char *code, const char *file, std::uint32_t line, int fatal);
 
 }

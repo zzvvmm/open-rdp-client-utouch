@@ -38,6 +38,7 @@ ironrdp-session = "0.11.0"
 ironrdp-svc = "0.8.0"
 ironrdp-tls = { version = "0.2.2", default-features = false, features = ["rustls-ring"] }
 ironrdp-tokio = { version = "0.10.0", default-features = false }
+sentry = { version = "0.49.3", default-features = false, features = ["backtrace", "reqwest", "rustls-no-provider"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 sha2 = "0.10"

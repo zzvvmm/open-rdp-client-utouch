@@ -14,6 +14,8 @@ fn automatic_updates_enabled() -> bool {
     true
 }
 
+fn error_reporting_enabled() -> bool { true }
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppSettings {
     pub theme_mode: String, // "dark", "light", "system"
@@ -26,6 +28,8 @@ pub struct AppSettings {
     pub trackpad_speed_percent: u32,
     pub show_stats_overlay: bool,
     pub strict_cert_check: bool,
+    #[serde(default = "error_reporting_enabled")]
+    pub report_errors: bool,
     #[serde(default = "automatic_updates_enabled")]
     pub auto_check_updates: bool,
     #[serde(default)]
@@ -46,6 +50,7 @@ impl Default for AppSettings {
             trackpad_speed_percent: 100,
             show_stats_overlay: false,
             strict_cert_check: false,
+            report_errors: true,
             auto_check_updates: true,
             skipped_update_version: String::new(),
             last_update_check_epoch: 0,
@@ -156,6 +161,22 @@ impl StorageDatabase {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn error_reporting_defaults_on_and_opt_out_survives_restart() {
+        let dir = tempdir().unwrap();
+        let db = StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
+        let mut legacy = serde_json::to_value(AppSettings::default()).unwrap();
+        legacy.as_object_mut().unwrap().remove("report_errors");
+        legacy["theme_mode"] = serde_json::json!("light");
+        let mut settings: AppSettings = serde_json::from_value(legacy).unwrap();
+        assert!(settings.report_errors);
+        assert_eq!(settings.theme_mode, "light");
+        settings.report_errors = false;
+        db.save_settings(&settings).unwrap();
+        let reopened = StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
+        assert!(!reopened.load_settings().report_errors);
+    }
 
     #[test]
     fn touch_defaults_preserve_saved_trackpad_choices() {

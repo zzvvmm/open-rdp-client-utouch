@@ -13,6 +13,7 @@ use crate::rdp::session_worker::{
     spawn_rdp_session, RdpCommand, RdpSessionConfig, RdpSessionHandle, RdpWorkerEvent, SessionStage,
 };
 use crate::storage::{AppSettings, CredentialVault, StorageDatabase};
+use crate::error_reporting::{ErrorReporter, backend_error};
 
 pub type UiEventCallback = Arc<dyn Fn(&str, &[u8]) + Send + Sync + 'static>;
 
@@ -23,6 +24,7 @@ pub struct AppController {
     accounts: Mutex<Vec<UserAccount>>,
     cert_store: Arc<Mutex<CertStore>>,
     settings: Mutex<AppSettings>,
+    error_reporter: Arc<ErrorReporter>,
     framebuffer: Arc<Mutex<SharedFrameBuffer>>,
     input_mapper: Mutex<InputMapper>,
     active_session: Mutex<Option<Arc<RdpSessionHandle>>>,
@@ -53,6 +55,7 @@ impl AppController {
         }
 
         let initial_touch = settings.default_touch_mode;
+        let error_reporter = ErrorReporter::new(settings.report_errors);
 
         Arc::new(Self {
             db,
@@ -61,6 +64,7 @@ impl AppController {
             accounts: Mutex::new(accounts),
             cert_store: Arc::new(Mutex::new(cert_store)),
             settings: Mutex::new(settings),
+            error_reporter,
             framebuffer: SharedFrameBuffer::new_shared(1280, 720),
             input_mapper: Mutex::new(InputMapper::new(1280, 720)),
             active_session: Mutex::new(None),
@@ -194,6 +198,7 @@ impl AppController {
                 "trackpadSpeedPercent": settings.trackpad_speed_percent,
                 "showStatsOverlay": settings.show_stats_overlay,
                 "strictCertCheck": settings.strict_cert_check,
+                "reportErrors": settings.report_errors,
                 "autoCheckUpdates": settings.auto_check_updates,
                 "skippedUpdateVersion": settings.skipped_update_version,
                 "lastUpdateCheckEpoch": settings.last_update_check_epoch,
@@ -706,6 +711,9 @@ impl AppController {
         if let Some(strict) = v.get("strictCertCheck").and_then(Value::as_bool) {
             settings.strict_cert_check = strict;
         }
+        if let Some(enabled) = v.get("reportErrors").and_then(Value::as_bool) {
+            settings.report_errors = enabled;
+        }
         if let Some(enabled) = v.get("autoCheckUpdates").and_then(Value::as_bool) {
             settings.auto_check_updates = enabled;
         }
@@ -715,7 +723,12 @@ impl AppController {
         if let Some(epoch) = v.get("lastUpdateCheckEpoch").and_then(Value::as_u64) {
             settings.last_update_check_epoch = epoch;
         }
-        self.db.save_settings(&settings)
+        // Honor opt-out before disk I/O, including when persisting settings fails.
+        self.error_reporter.set_enabled(settings.report_errors);
+        self.db.save_settings(&settings).map_err(|error| {
+            self.emit_json(&json!({ "type": "toast_error", "message": error }));
+            error
+        })
     }
 
     fn handle_connect_pc(self: &Arc<Self>, v: &Value) -> Result<(), String> {
@@ -999,6 +1012,11 @@ impl AppController {
                 reason,
                 is_error,
             } => {
+                if is_error {
+                    if let Some(code) = backend_error(&reason) {
+                        self.error_reporter.capture(code, file!(), line!());
+                    }
+                }
                 if let Ok(mut st) = self.session_stage.lock() {
                     *st = if is_error {
                         SessionStage::Error
@@ -1040,6 +1058,24 @@ impl AppController {
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn opting_out_disables_reports_even_when_settings_storage_fails() {
+        let dir = tempdir().unwrap();
+        let config = dir.path().join("config");
+        let db = StorageDatabase::open_at(config.clone(), dir.path().join("cache")).unwrap();
+        let vault = CredentialVault::open_at(dir.path().join("vault")).unwrap();
+        let events = Arc::new(Mutex::new(Vec::<Value>::new()));
+        let captured = Arc::clone(&events);
+        let ctrl = AppController::new(db, vault, Arc::new(move |json, _| {
+            captured.lock().unwrap().push(serde_json::from_str(json).unwrap());
+        }));
+        std::fs::remove_dir_all(&config).unwrap();
+        std::fs::write(&config, "block settings storage").unwrap();
+        assert!(ctrl.dispatch_action(r#"{"action":"save_settings","reportErrors":false}"#).is_err());
+        assert!(ctrl.error_reporter.capture(crate::error_reporting::ErrorCode::RdpDecode, file!(), line!()).is_nil());
+        assert!(events.lock().unwrap().iter().any(|event| event["type"] == "toast_error"));
+    }
 
     #[test]
     fn saving_and_editing_preserves_hostnames_ipv6_and_ports_on_disk() {
@@ -1112,10 +1148,13 @@ mod tests {
         assert_eq!(first["appFramework"], crate::storage::database::APP_FRAMEWORK);
         assert!(first["appArchitecture"].as_str().is_some());
         assert_eq!(first["settings"]["autoCheckUpdates"], true);
+        assert_eq!(first["settings"]["reportErrors"], true);
+        ctrl.dispatch_action(r#"{"action":"save_settings","reportErrors":false}"#).unwrap();
         ctrl.dispatch_action(r#"{"action":"save_settings","autoCheckUpdates":false,"skippedUpdateVersion":"0.1.4","lastUpdateCheckEpoch":1800000000}"#).unwrap();
         ctrl.dispatch_action(r#"{"action":"save_settings","themeMode":"light"}"#).unwrap();
         let stored = db.load_settings();
         assert!(!stored.auto_check_updates);
+        assert!(!stored.report_errors);
         assert_eq!(stored.skipped_update_version, "0.1.4");
         assert_eq!(stored.last_update_check_epoch, 1_800_000_000);
         assert_eq!(stored.theme_mode, "light");
