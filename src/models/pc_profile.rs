@@ -11,13 +11,14 @@ pub enum ResolutionMode {
 
 impl Default for ResolutionMode {
     fn default() -> Self {
-        Self::Dynamic
+        Self::Native
     }
 }
 
 impl ResolutionMode {
     pub fn from_preset_key(key: &str) -> Self {
         match key.trim() {
+            "dynamic" => Self::Dynamic,
             "native" => Self::Native,
             "1920x1080" => Self::Fixed {
                 width: 1920,
@@ -35,7 +36,7 @@ impl ResolutionMode {
                 width: 1280,
                 height: 720,
             },
-            _ => Self::Dynamic,
+            _ => Self::default(),
         }
     }
 
@@ -142,6 +143,7 @@ pub struct PcProfile {
     pub port: u16,
     pub friendly_name: String,
     pub account_id: Option<String>,
+    #[serde(default)]
     pub resolution_mode: ResolutionMode,
     pub scale_factor: u32,
     pub clipboard_redirection: bool,
@@ -165,7 +167,7 @@ impl PcProfile {
             port,
             friendly_name: friendly_name.trim().to_string(),
             account_id: None,
-            resolution_mode: ResolutionMode::Dynamic,
+            resolution_mode: ResolutionMode::default(),
             scale_factor: 100,
             clipboard_redirection: true,
             audio_mode: AudioRedirectionMode::PlayOnDevice,

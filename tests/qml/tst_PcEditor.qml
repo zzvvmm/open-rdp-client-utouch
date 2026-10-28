@@ -20,6 +20,22 @@ Item {
 
         function cleanup() { editor.active = false }
 
+        function test_default_options_are_first_and_selected() {
+            editor.openForNew()
+            var nativeOption = findChild(editor, "resolutionOption_native")
+            var dynamicOption = findChild(editor, "resolutionOption_dynamic")
+            var directOption = findChild(editor, "directTouchOption")
+            var trackpadOption = findChild(editor, "trackpadOption")
+            compare(editor.resolutionPreset, "native")
+            compare(editor.defaultTouchMode, "direct_touch")
+            compare(nativeOption.x, 0)
+            compare(nativeOption.y, 0)
+            verify(dynamicOption.x > nativeOption.x || dynamicOption.y > nativeOption.y)
+            verify(directOption.x < trackpadOption.x)
+            compare(nativeOption.color, "#0078d4")
+            compare(directOption.color, "#0078d4")
+        }
+
         function test_address_input_disables_keyboard_rewriting() {
             var field = findChild(editor, "pcHostField")
             verify(field.inputMethodHints & Qt.ImhNoPredictiveText)
@@ -29,8 +45,22 @@ Item {
         function test_direct_touch_default_preserves_explicit_trackpad_choice() {
             editor.openForNew()
             compare(editor.defaultTouchMode, "direct_touch")
+            compare(editor.resolutionPreset, "native")
+            var field = findChild(editor, "pcHostField")
+            field.insert(0, "host-01")
+            mouseClick(findChild(editor, "savePcButton"))
+            compare(saved.signalArguments[0][0].resolutionPreset, "native")
+            compare(saved.signalArguments[0][0].defaultTouchMode, "direct_touch")
             editor.openForEdit({ id: "old-pc", hostname: "host", defaultTouchMode: "mouse_pointer" })
             compare(editor.defaultTouchMode, "mouse_pointer")
+        }
+
+        function test_explicit_dynamic_resolution_is_preserved() {
+            compare(editor.resolutionPreset, "dynamic")
+            editor.openForEdit({ id: "old-pc", hostname: "host", resolutionPreset: "dynamic" })
+            compare(editor.resolutionPreset, "dynamic")
+            mouseClick(findChild(editor, "savePcButton"))
+            compare(saved.signalArguments[0][0].resolutionPreset, "dynamic")
         }
 
         function test_save_literal_address_data() {

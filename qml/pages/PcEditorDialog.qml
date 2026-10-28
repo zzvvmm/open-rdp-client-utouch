@@ -13,7 +13,7 @@ Rectangle {
     property string friendlyName: ""
     property string groupName: "Saved PCs"
     property string accountId: ""
-    property string resolutionPreset: "dynamic"
+    property string resolutionPreset: "native"
     property int scaleFactor: 100
     property string defaultTouchMode: "direct_touch"
     property string audioMode: "play_on_device"
@@ -30,7 +30,7 @@ Rectangle {
         friendlyName = ""
         groupName = "Saved PCs"
         accountId = ""
-        resolutionPreset = defaultRes || "dynamic"
+        resolutionPreset = defaultRes || "native"
         scaleFactor = defaultScale || 100
         defaultTouchMode = defaultTouch || "direct_touch"
         audioMode = defaultAudio || "play_on_device"
@@ -46,7 +46,7 @@ Rectangle {
         friendlyName = pc.friendlyName || ""
         groupName = pc.groupName || "Saved PCs"
         accountId = pc.accountId || ""
-        resolutionPreset = pc.resolutionPreset || "dynamic"
+        resolutionPreset = pc.resolutionPreset || "native"
         scaleFactor = pc.scaleFactor || 100
         defaultTouchMode = pc.defaultTouchMode || "direct_touch"
         audioMode = pc.audioMode || "play_on_device"
@@ -196,14 +196,15 @@ Rectangle {
                         spacing: units.gu(0.8)
                         Repeater {
                             model: [
-                                { key: "dynamic", label: "Dynamic (Fit)" },
                                 { key: "native", label: "Device Native" },
+                                { key: "dynamic", label: "Dynamic (Fit)" },
                                 { key: "1920x1080", label: "1920×1080" },
                                 { key: "1600x900", label: "1600×900" },
                                 { key: "1366x768", label: "1366×768" },
                                 { key: "1280x720", label: "1280×720" }
                             ]
                             delegate: Button {
+                                objectName: "resolutionOption_" + modelData.key
                                 text: modelData.label
                                 color: root.resolutionPreset === modelData.key ? "#0078D4" : (root.darkMode ? "#263042" : "#E2E8F0")
                                 onClicked: root.resolutionPreset = modelData.key
@@ -241,14 +242,16 @@ Rectangle {
                     Row {
                         spacing: units.gu(1)
                         Button {
-                            text: i18n.tr("Mouse Pointer (Trackpad)")
-                            color: root.defaultTouchMode === "mouse_pointer" ? "#0078D4" : (root.darkMode ? "#263042" : "#E2E8F0")
-                            onClicked: root.defaultTouchMode = "mouse_pointer"
-                        }
-                        Button {
+                            objectName: "directTouchOption"
                             text: i18n.tr("Direct Touch")
                             color: root.defaultTouchMode === "direct_touch" ? "#0078D4" : (root.darkMode ? "#263042" : "#E2E8F0")
                             onClicked: root.defaultTouchMode = "direct_touch"
+                        }
+                        Button {
+                            objectName: "trackpadOption"
+                            text: i18n.tr("Mouse Pointer (Trackpad)")
+                            color: root.defaultTouchMode === "mouse_pointer" ? "#0078D4" : (root.darkMode ? "#263042" : "#E2E8F0")
+                            onClicked: root.defaultTouchMode = "mouse_pointer"
                         }
                     }
 

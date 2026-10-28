@@ -9,7 +9,7 @@ use ironrdp_connector::connection_activation::ConnectionActivationState;
 use ironrdp_connector::sspi::{self, Error as SspiError, ErrorKind as SspiErrorKind};
 use ironrdp_connector::{
     custom_err, general_err, BitmapConfig, ClientConnector, ConnectionResult, ConnectorResult,
-    Credentials, DesktopSize, ServerName as RdpServerName,
+    Credentials, DesktopSize, ServerName as RdpServerName, Sequence as _,
 };
 use ironrdp_core::{decode_cursor, WriteBuf};
 use ironrdp_displaycontrol::client::DisplayControlClient;
@@ -22,13 +22,13 @@ use ironrdp_pdu::geometry::Rectangle as _;
 use ironrdp_pdu::input::fast_path::FastPathInputEvent;
 use ironrdp_pdu::input::mouse::PointerFlags;
 use ironrdp_pdu::rdp::capability_sets::{client_codecs_capabilities, MajorPlatformType};
-use ironrdp_pdu::rdp::client_info::{CompressionType, PerformanceFlags, TimezoneInfo};
+use ironrdp_pdu::rdp::client_info::{PerformanceFlags, TimezoneInfo};
 use ironrdp_session::image::DecodedImage;
 use ironrdp_session::{
     fast_path, ActiveStageBuilder, ActiveStageOutput, GracefulDisconnectReason, SessionResult,
 };
 use ironrdp_tokio::{
-    single_sequence_step_read, split_tokio_framed, FramedWrite as _, NetworkClient,
+    split_tokio_framed, FramedWrite as _, NetworkClient,
     TokioFramed,
 };
 use serde::{Deserialize, Serialize};
@@ -747,7 +747,9 @@ fn build_client_connector(
         request_data: None,
         pointer_software_rendering: true,
         multitransport_flags: None,
-        compression_type: Some(CompressionType::K64),
+        // IronRDP 0.11's outer bulk compression can silently corrupt XRDP
+        // graphics across reactivation. RemoteFX codec compression remains on.
+        compression_type: None,
         performance_flags: PerformanceFlags::default(),
         timezone_info: TimezoneInfo::default(),
         alternate_shell: String::new(),
@@ -805,7 +807,6 @@ async fn drive_active_session(
     let desktop_size = connection_result.desktop_size;
     let mut image = DecodedImage::new(PixelFormat::RgbA32, desktop_size.width, desktop_size.height);
     let activation_factory = connection_result.activation_factory;
-    let compression_type = connection_result.compression_type;
     let io_channel_id = connection_result.io_channel_id;
 
     let mut active_stage = ActiveStageBuilder {
@@ -824,10 +825,17 @@ async fn drive_active_session(
     let mut fps_window_start = tokio::time::Instant::now();
     let mut current_fps = 30u32;
     let mut display_resize = DisplayResize::default();
+    let mut deferred_frames = crate::rdp::reactivation::DeferredFrames::new();
 
     let reason = 'outer: loop {
         let outputs = tokio::select! {
-            frame = reader.read_pdu() => {
+            frame = async {
+                if let Some((action, payload)) = deferred_frames.pop_front() {
+                    Ok((action, payload.as_slice().into()))
+                } else {
+                    reader.read_pdu().await
+                }
+            } => {
                 let (action, payload) = frame.map_err(|e| ironrdp_session::custom_err!("read PDU", e))?;
                 let short_deactivate_all = matches!(&action, ironrdp_pdu::Action::X224)
                     && is_xrdp_short_deactivate_all(&payload, io_channel_id);
@@ -966,13 +974,16 @@ async fn drive_active_session(
                 ActiveStageOutput::DeactivateAll => {
                     let mut connection_activation = activation_factory.create();
                     let mut buf = WriteBuf::new();
+                    let deadline = tokio::time::Instant::now() + Duration::from_secs(15);
                     loop {
-                        let written = single_sequence_step_read(
-                            &mut reader,
-                            &mut connection_activation,
-                            &mut buf,
-                        )
-                        .await
+                        buf.clear();
+                        let input = if let Some(hint) = connection_activation.next_pdu_hint() {
+                            crate::rdp::reactivation::read_input(&mut reader, hint,
+                                connection_activation.io_channel_id(), &mut deferred_frames, deadline)
+                                .await
+                                .map_err(|e| ironrdp_session::custom_err!("read reactivation input", e))?
+                        } else { Vec::new() };
+                        let written = connection_activation.step(&input, &mut buf)
                         .map_err(|e| {
                             ironrdp_session::custom_err!("deactivation-reactivation step", e)
                         })?;
@@ -1000,19 +1011,17 @@ async fn drive_active_session(
                                 width: desktop_size.width,
                                 height: desktop_size.height,
                             });
-                            active_stage.set_fastpath_processor(
+                            active_stage.reactivate(
                                 fast_path::ProcessorBuilder {
                                     io_channel_id: connection_activation.io_channel_id(),
                                     user_channel_id: connection_activation.user_channel_id(),
                                     share_id,
                                     enable_server_pointer,
                                     pointer_software_rendering,
-                                    bulk_decompressor: crate::rdp::display_resize::bulk_decompressor(compression_type)?,
-                                }
-                                .build(),
+                                    // Keep the connection's compression dictionary.
+                                    bulk_decompressor: None,
+                                },
                             );
-                            active_stage.set_share_id(share_id);
-                            active_stage.set_enable_server_pointer(enable_server_pointer);
                             break;
                         }
                     }
@@ -1021,7 +1030,7 @@ async fn drive_active_session(
                 ActiveStageOutput::MultitransportRequest(_) | ActiveStageOutput::AutoDetect(_) => {}
             }
         }
-        if let Some(frame) = display_resize.frame(&mut active_stage) {
+        if let Some(frame) = deferred_frames.is_empty().then(|| display_resize.frame(&mut active_stage)).flatten() {
             writer.write_all(&frame).await.map_err(|e| {
                 ironrdp_session::custom_err!("write display resize", e)
             })?;
