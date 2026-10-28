@@ -21,12 +21,12 @@ For Sentry projects, reporting privacy, and verification, see
   - Pure-Rust **IronRDP** (`ironrdp-connector`, `ironrdp-session`, `ironrdp-tokio`, `ironrdp-tls`) running on a dedicated `tokio` worker thread.
   - **CredSSP / NLA (Network Level Authentication)** with `DOMAIN\username` and UPN support.
   - **Trust-On-First-Use (TOFU) Certificate Verification (`CertPromptDialog.qml`)**: Inspects X.509 Common Name, Issuer, Validity dates, and SHA-256 fingerprint before sending NLA credentials, and alerts on fingerprint mismatches.
-  - **Dynamic Display Resize (`DISP` DVC Channel)**: Resizes dynamic-resolution desktops when the server's display channel is ready. Rotation keeps the session open and fits the existing desktop when resizing is unavailable; fixed-resolution profiles keep their selected size.
+  - **Display Resolution**: Device Native is the first and default option for new PCs. Dynamic (Fit) waits for desktop content before resizing through the server's `DISP` channel and preserves graphics state and interleaved updates across reactivation. RemoteFX compression stays enabled; outer bulk compression is disabled to avoid XRDP resize corruption. Rotation fits the existing desktop when resizing is unavailable; fixed-resolution profiles keep their selected size.
   - **Bidirectional Clipboard Redirection (`CLIPRDR`)**: Syncs Unicode text (`CF_UNICODETEXT` / `CF_TEXT`) between Ubuntu Touch and the remote Windows session.
   - **Audio Output Redirection (`RDPSND`)**: Streams 44.1 kHz / 48 kHz 16-bit stereo PCM audio from the remote PC to Ubuntu Touch via `QtMultimedia`.
 - **Touchscreen Ergonomics Built for Mobile (`VirtualTrackpad.qml` & `VirtualKeyBar.qml`)**
   - **Mouse Pointer (Virtual Trackpad) Mode**: Relative trackpad movement with configurable speed, 1-finger tap left-click, double-tap, long-press drag selection, 2-finger tap right-click, and 2-finger scroll wheel.
-  - **Direct Touch Mode (default for new PCs)**: Tap directly at remote coordinates, drag to move windows or select text, and press-and-hold to right-click with a visual indicator. Saved input-mode choices are preserved.
+  - **Direct Touch Mode (first and default for new PCs)**: Tap directly at remote coordinates, drag to move windows or select text, and press-and-hold to right-click with a visual indicator. Old global defaults migrate once; saved PCs keep their selected input and resolution modes.
   - **Explicit Mouse Controls**: Dedicated left-click, right-click, double-click, drag lock, and precision pointer controls. Gesture cancellation releases held buttons.
   - **Zoom & Cursor-Following Pan (`RdpViewport.qml`)**: Quick `100%` / `150%` / `200%` zoom; in trackpad mode the viewport follows the pointer without stealing remote drag gestures.
   - **Hardware Mouse & Keyboard**: Absolute mouse positioning, all three mouse buttons, dragging, wheel input, and hardware keyboard shortcuts. Navigation keys are sent with matching releases.

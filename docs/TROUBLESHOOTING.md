@@ -55,6 +55,36 @@ remove a loopback-only binding in Kerberos UDP authentication. These address
 specific app defects; they do not establish the cause of every VPN failure.
 The reporter's WireGuard setup has not been reproduced yet.
 
+## Dynamic (Fit): no RFX channel found
+
+This error concerns the RemoteFX graphics codec's saved channel state. A display
+resize can trigger RDP deactivation/reactivation. The pending fix preserves codec
+headers, compression history, and fragmented graphics during that sequence, and
+updates frame acknowledgement parameters. It queues interleaved frames instead
+of dropping them while reading activation messages.
+
+A blank or corrupted screen can also occur without a connection error. The
+client now waits for desktop pixels before the first DISP request, clears the
+resized framebuffer, and disables outer RDP bulk compression to avoid corruption
+seen with the current engine and XRDP. RemoteFX graphics compression stays on.
+
+Until a build containing the fix is installed, edit the PC and select **Device
+Native** or a fixed resolution, then reconnect. Device Native becomes the default
+for new PCs; existing saved Dynamic (Fit) selections remain available.
+
+The regression test decodes RemoteFX tile updates across portrait/landscape
+reactivations, with and without bulk compression. This reproduces the old error
+when the graphics processor is replaced, and verifies updated frame
+acknowledgements and continued keyboard input with the fix. A local XRDP/Xorg
+session also passed three live resizes with a coherent synthetic terminal image.
+The affected host still needs device retesting before release.
+
+On upgrade, old global Dynamic/Mouse Pointer defaults migrate once to Device
+Native/Direct Touch. Open **Add PC** to see those defaults selected as the first
+options. Editing an existing PC retains that PC's saved selections.
+
+Related report: [OPEN-RDP-CLIENT-UTOUCH-BACKEND-2](https://dd-0q.sentry.io/issues/7816583170/).
+
 ## Information to include in a report
 
 - App version, Ubuntu Touch version, and device model.

@@ -55,6 +55,10 @@ x509-cert = { version = "0.2", default-features = false, features = ["std"] }
 [dev-dependencies]
 tempfile = "3.12"
 
+# Preserve graphics codec state during display reactivation; see vendor patch notes.
+[patch.crates-io]
+ironrdp-session = { path = "vendor/ironrdp-session" }
+
 [profile.release]
 opt-level = 2
 lto = "thin"

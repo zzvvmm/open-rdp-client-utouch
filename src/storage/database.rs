@@ -18,7 +18,10 @@ fn error_reporting_enabled() -> bool { true }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppSettings {
+    #[serde(default)]
+    pub connection_defaults_revision: u32,
     pub theme_mode: String, // "dark", "light", "system"
+    #[serde(default)]
     pub default_resolution: ResolutionMode,
     pub default_scale_factor: u32,
     #[serde(default)]
@@ -41,8 +44,9 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
+            connection_defaults_revision: 1,
             theme_mode: "dark".to_string(),
-            default_resolution: ResolutionMode::Dynamic,
+            default_resolution: ResolutionMode::default(),
             default_scale_factor: 100,
             default_touch_mode: TouchInputMode::default(),
             default_audio_mode: AudioRedirectionMode::PlayOnDevice,
@@ -131,7 +135,18 @@ impl StorageDatabase {
     }
 
     pub fn load_settings(&self) -> AppSettings {
-        self.read_json_file("settings.json").unwrap_or_default()
+        let mut settings: AppSettings = self.read_json_file("settings.json").unwrap_or_default();
+        if settings.connection_defaults_revision < 1 {
+            // Older releases persisted their implicit defaults on any settings
+            // save. Upgrade those global defaults once, without editing saved PCs.
+            if settings.default_resolution == ResolutionMode::Dynamic {
+                settings.default_resolution = ResolutionMode::Native;
+            }
+            settings.default_touch_mode = TouchInputMode::DirectTouch;
+            settings.connection_defaults_revision = 1;
+            let _ = self.save_settings(&settings);
+        }
+        settings
     }
 
     pub fn save_settings(&self, settings: &AppSettings) -> Result<(), String> {
@@ -176,6 +191,58 @@ mod tests {
         db.save_settings(&settings).unwrap();
         let reopened = StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
         assert!(!reopened.load_settings().report_errors);
+    }
+
+    #[test]
+    fn legacy_global_defaults_migrate_once_without_changing_saved_pcs() {
+        let dir = tempdir().unwrap();
+        let config = dir.path().join("config");
+        let cache = dir.path().join("cache");
+        let db = StorageDatabase::open_at(config.clone(), cache.clone()).unwrap();
+        let mut legacy = serde_json::to_value(AppSettings::default()).unwrap();
+        legacy.as_object_mut().unwrap().remove("connection_defaults_revision");
+        legacy["default_resolution"] = serde_json::json!({"mode":"dynamic"});
+        legacy["default_touch_mode"] = serde_json::json!("mouse_pointer");
+        legacy["report_errors"] = serde_json::json!(false);
+        legacy["theme_mode"] = serde_json::json!("light");
+        db.write_json_atomic("settings.json", &legacy).unwrap();
+        let mut pc = PcProfile::new("host-01", "").unwrap();
+        pc.resolution_mode = ResolutionMode::Dynamic;
+        pc.default_touch_mode = TouchInputMode::MousePointer;
+        db.save_profiles(&[pc.clone()]).unwrap();
+        let mut migrated = db.load_settings();
+        assert_eq!(migrated.default_resolution, ResolutionMode::Native);
+        assert_eq!(migrated.default_touch_mode, TouchInputMode::DirectTouch);
+        assert_eq!(migrated.theme_mode, "light");
+        assert!(!migrated.report_errors);
+        assert_eq!(db.load_profiles(), vec![pc]);
+        // Later explicit global choices must survive subsequent restarts.
+        migrated.default_resolution = ResolutionMode::Dynamic;
+        migrated.default_touch_mode = TouchInputMode::MousePointer;
+        db.save_settings(&migrated).unwrap();
+        let reopened = StorageDatabase::open_at(config, cache).unwrap();
+        assert_eq!(reopened.load_settings(), migrated);
+    }
+
+    #[test]
+    fn native_resolution_defaults_preserve_saved_dynamic_choices() {
+        let dir = tempdir().unwrap();
+        let db = StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
+        assert_eq!(db.load_settings().default_resolution, ResolutionMode::Native);
+        let profile = PcProfile::new("host-01", "").unwrap();
+        assert_eq!(profile.resolution_mode, ResolutionMode::Native);
+        let mut legacy = serde_json::to_value(AppSettings::default()).unwrap();
+        legacy.as_object_mut().unwrap().remove("default_resolution");
+        let mut settings: AppSettings = serde_json::from_value(legacy).unwrap();
+        assert_eq!(settings.default_resolution, ResolutionMode::Native);
+        settings.default_resolution = ResolutionMode::Dynamic;
+        db.save_settings(&settings).unwrap();
+        assert_eq!(db.load_settings().default_resolution, ResolutionMode::Dynamic);
+        let mut profile = profile;
+        profile.resolution_mode = ResolutionMode::Dynamic;
+        profile.default_touch_mode = TouchInputMode::MousePointer;
+        db.save_profiles(&[profile.clone()]).unwrap();
+        assert_eq!(db.load_profiles(), vec![profile]);
     }
 
     #[test]

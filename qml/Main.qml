@@ -21,7 +21,7 @@ MainView {
     property var knownCertsList: []
     property var appSettings: ({
         themeMode: "dark",
-        defaultResolution: "dynamic",
+        defaultResolution: "native",
         defaultScaleFactor: 100,
         defaultTouchMode: "direct_touch",
         defaultAudioMode: "play_on_device",

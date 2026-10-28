@@ -310,7 +310,7 @@ impl AppController {
             }
             "set_touch_mode" => {
                 let mode = TouchInputMode::from_key(
-                    v.get("mode").and_then(Value::as_str).unwrap_or("mouse_pointer"),
+                    v.get("mode").and_then(Value::as_str).unwrap_or("direct_touch"),
                 );
                 if let Ok(mut guard) = self.active_touch_mode.lock() {
                     *guard = mode;
@@ -498,7 +498,7 @@ impl AppController {
         let resolution_mode = ResolutionMode::from_preset_key(
             v.get("resolutionPreset")
                 .and_then(Value::as_str)
-                .unwrap_or("dynamic"),
+                .unwrap_or("native"),
         );
         let scale_factor = v
             .get("scaleFactor")

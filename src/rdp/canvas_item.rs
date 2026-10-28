@@ -114,6 +114,9 @@ impl SharedFrameBuffer {
         self.width = w;
         self.height = h;
         self.rgba.resize(usize::from(w) * usize::from(h) * 4, 0);
+        // Vec::resize retains old bytes when shrinking. Their old row stride
+        // must never be displayed as pixels belonging to the resized desktop.
+        self.rgba.fill(0);
         self.cursor_x = self.cursor_x.min(w.saturating_sub(1));
         self.cursor_y = self.cursor_y.min(h.saturating_sub(1));
         self.frame_seq = self.frame_seq.wrapping_add(1);
@@ -398,6 +401,18 @@ pub fn encode_rgba_png(width: u32, height: u32, rgba: &[u8]) -> Result<Vec<u8>, 
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    #[test]
+    fn resizing_clears_pixels_with_the_old_row_stride() {
+        let mut fb = SharedFrameBuffer::new(800, 600);
+        fb.update_full_rgba(800, 600, &vec![255; 800 * 600 * 4]);
+        let sequence = fb.frame_seq();
+        fb.resize_clear(450, 680);
+        assert_eq!((fb.width(), fb.height()), (450, 680));
+        assert!(fb.rgba_bytes().iter().all(|byte| *byte == 0));
+        assert!(fb.frame_seq() > sequence);
+        assert_eq!(fb.take_dirty(), Some(DirtyRect { x: 0, y: 0, width: 450, height: 680 }));
+    }
 
     #[test]
     fn test_demo_desktop_and_png_thumbnail() {
