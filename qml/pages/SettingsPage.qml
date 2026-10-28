@@ -56,6 +56,49 @@ Flickable {
             color: root.darkMode ? "#F3F6FA" : "#1B2028"
         }
 
+        Rectangle {
+            width: parent.width
+            height: reportingCol.implicitHeight + units.gu(3)
+            radius: units.gu(1.4)
+            color: root.darkMode ? "#1C2331" : "#FFFFFF"
+            border.width: units.dp(1)
+            border.color: root.darkMode ? "#2B3548" : "#DCE2EC"
+
+            Column {
+                id: reportingCol
+                width: parent.width - units.gu(3)
+                anchors.centerIn: parent
+                spacing: units.gu(1.2)
+
+                Row {
+                    width: parent.width
+                    spacing: units.gu(1.5)
+                    CheckBox {
+                        id: reportErrors
+                        objectName: "reportErrorsCheckBox"
+                        checked: root.settings.reportErrors !== false
+                        onClicked: root.pushUpdate({ reportErrors: checked })
+                    }
+                    Label {
+                        width: parent.width - reportErrors.width - parent.spacing
+                        text: i18n.tr("Report Errors")
+                        fontSize: "medium"
+                        font.bold: true
+                        wrapMode: Text.WordWrap
+                        color: root.darkMode ? "#F3F6FA" : "#1B2028"
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+                Label {
+                    width: parent.width
+                    text: i18n.tr("Send technical error reports to Sentry to help fix bugs. Enabled by default; changes apply immediately. Reports exclude credentials, PC addresses, screen contents, and clipboard text.")
+                    wrapMode: Text.WordWrap
+                    fontSize: "small"
+                    color: root.darkMode ? "#9BA7B8" : "#5A6577"
+                }
+            }
+        }
+
         // Theme Card
         Rectangle {
             width: parent.width

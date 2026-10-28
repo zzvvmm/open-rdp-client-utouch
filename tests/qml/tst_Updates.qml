@@ -171,6 +171,22 @@ Item {
             verify(manager.checkAutomatically())
         }
 
+        function test_report_errors_defaults_on_and_saves_only_its_preference() {
+            showSettings = true
+            fixture.preferences = { autoCheckUpdates: false, themeMode: "light" }
+            var checkbox = findChild(settings, "reportErrorsCheckBox")
+            verify(checkbox.checked)
+            mouseClick(checkbox)
+            compare(fixture.preferences.reportErrors, false)
+            compare(fixture.preferences.autoCheckUpdates, false)
+            compare(fixture.preferences.themeMode, "light")
+            showSettings = false
+            showSettings = true
+            compare(checkbox.checked, false)
+            mouseClick(checkbox)
+            compare(fixture.preferences.reportErrors, true)
+        }
+
         function test_manual_check_works_when_automatic_disabled_and_skipped() {
             fixture.preferences = { autoCheckUpdates: false, skippedUpdateVersion: "0.1.4" }
             verify(!manager.checkAutomatically())

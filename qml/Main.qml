@@ -29,6 +29,7 @@ MainView {
         trackpadSpeedPercent: 100,
         showStatsOverlay: false,
         strictCertCheck: false,
+        reportErrors: true,
         autoCheckUpdates: true,
         skippedUpdateVersion: "",
         lastUpdateCheckEpoch: 0

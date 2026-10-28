@@ -1,0 +1,7 @@
+{
+  "organization": "dd-0q",
+  "backend_project": "open-rdp-client-utouch-backend",
+  "backend_dsn": "https://f6965d66ac8921cec2fbf9a979e0a5c1@o1055020.ingest.us.sentry.io/4512333811023872",
+  "ui_project": "open-rdp-client-utouch-ui",
+  "ui_dsn": "https://ca652be97ef9a74537bf0744be421549@o1055020.ingest.us.sentry.io/4512333811482624"
+}

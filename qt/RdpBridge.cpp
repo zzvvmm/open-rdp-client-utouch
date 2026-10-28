@@ -6,10 +6,48 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMetaObject>
+#include <QRegularExpression>
+#include <cstdio>
+#include <mutex>
+
+namespace {
+QtMessageHandler previousMessageHandler = nullptr;
+std::once_flag reportingHandlerInstalled;
+
+void reportQtMessage(QtMsgType type, const QMessageLogContext &context, const QString &message) {
+    thread_local bool reporting = false;
+    if (!reporting) {
+        reporting = true;
+        const char *code = nullptr;
+        if (type == QtCriticalMsg || type == QtFatalMsg) code = "qt_critical";
+        else if (type == QtWarningMsg) {
+            if (message.contains(QStringLiteral("ReferenceError:"))) code = "qml_reference";
+            else if (message.contains(QStringLiteral("TypeError:"))) code = "qml_type";
+            else if (message.contains(QStringLiteral("Binding loop detected"))) code = "qml_binding";
+            else if (message.contains(QStringLiteral("SyntaxError:"))) code = "qml_load";
+        }
+        if (code) {
+            QString source = QString::fromUtf8(context.file ? context.file : "");
+            unsigned int line = context.line > 0 ? context.line : 0;
+            static const QRegularExpression qmlLocation(QStringLiteral("^(qrc:/qml/[A-Za-z0-9_/.-]+\\.qml):(\\d+):"));
+            const auto location = qmlLocation.match(message);
+            if (location.hasMatch()) { source = location.captured(1); line = location.captured(2).toUInt(); }
+            const auto file = source.toUtf8();
+            rdp_report_ui_error(code, file.constData(), line, type == QtFatalMsg ? 1 : 0);
+        }
+        reporting = false;
+    }
+    if (previousMessageHandler) previousMessageHandler(type, context, message);
+    else std::fprintf(stderr, "%s\n", message.toLocal8Bit().constData());
+}
+}
 
 RdpBridge::RdpBridge(QObject *parent)
     : QObject(parent) {
     m_handle = rdp_app_create(&RdpBridge::onRustEvent, this);
+    std::call_once(reportingHandlerInstalled, []() {
+        previousMessageHandler = qInstallMessageHandler(reportQtMessage);
+    });
 
     if (auto *clip = QGuiApplication::clipboard()) {
         connect(clip, &QClipboard::dataChanged, this, [this, clip]() {

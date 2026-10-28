@@ -6,6 +6,8 @@ For the development workflow, version bumps, and releases to GitHub and OpenStor
 see the [development and release guide](docs/RELEASING.md).
 For hostname, connection, and WireGuard VPN problems, see
 [connection troubleshooting](docs/TROUBLESHOOTING.md).
+For Sentry projects, reporting privacy, and verification, see
+[error reporting](docs/ERROR_REPORTING.md).
 
 ---
 
@@ -36,6 +38,9 @@ For hostname, connection, and WireGuard VPN problems, see
   - **Check for updates** works even with automatic checks disabled and shows skipped updates when explicitly requested.
   - Available updates show their changelog with **Update Now**, **Update Later**, and **Skip This Version**. Update Now opens the app in OpenStore for installation; Later reminds at the next scheduled check, while Skip remembers that specific version across restarts.
   - Only stable releases for the installed architecture and framework are offered. Offline automatic checks stay quiet; manual check results appear in Settings.
+- **Error Reporting (`Settings → Report Errors`)**
+  - Enabled by default, with a persistent switch that immediately stops new reports.
+  - Sends scrubbed Rust panic, unexpected RDP failure, and Qt/QML error reports to separate Sentry projects. Reports exclude credentials, PC addresses, clipboard text, screen images, raw error messages, and local variable values.
 
 ---
 

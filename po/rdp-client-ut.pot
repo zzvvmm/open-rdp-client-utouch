@@ -143,3 +143,11 @@ msgstr ""
 
 msgid "Skipped version: "
 msgstr ""
+
+#: qml/pages/SettingsPage.qml
+msgid "Report Errors"
+msgstr ""
+
+#: qml/pages/SettingsPage.qml
+msgid "Send technical error reports to Sentry to help fix bugs. Enabled by default; changes apply immediately. Reports exclude credentials, PC addresses, screen contents, and clipboard text."
+msgstr ""

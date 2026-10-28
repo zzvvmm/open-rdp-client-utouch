@@ -27,6 +27,11 @@ int main(int argc, char *argv[]) {
     view.setSource(QUrl(QStringLiteral("qrc:/qml/Main.qml")));
 
     if (view.status() == QQuickView::Error) {
+        if (!view.errors().isEmpty()) {
+            const auto error = view.errors().first();
+            const auto file = error.url().toString().toUtf8();
+            rdp_report_ui_error("qml_load", file.constData(), error.line() > 0 ? error.line() : 0, 1);
+        }
         return 1;
     }
 
