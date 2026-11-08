@@ -1,0 +1,15 @@
+clickable_minimum_required: '8.0'
+builder: cmake
+framework: ubuntu-touch-24.04-1.x
+qt_version: '5.15'
+kill: rdp-client-ut
+make_jobs: 2
+root_dir: .
+src_dir: ${ROOT}
+build_args: [-DOPEN_RDP_PLATFORM=ubuntu-touch]
+test: exec env LIBGL_ALWAYS_SOFTWARE=1 python3 scripts/test-ubuntu-touch.py
+env_vars:
+  CARGO_BUILD_JOBS: '2'
+  CARGO_HOME: ${ROOT}/build/cargo-home
+  RUSTUP_HOME: /opt/rust/rustup
+  PKG_CONFIG_ALLOW_CROSS: '1'

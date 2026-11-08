@@ -73,7 +73,8 @@ release evidence. The current CI builds/tests on PRs and `main` pushes, without
 automated publication. Do not add tag-triggered publishing or secrets/config
 changes unless the task includes that automation.
 
-Local architectures share Cargo directories: build amd64 then arm64 sequentially.
+Build amd64 then arm64 sequentially when validating release packages. Each build
+has its own Cargo target directory; the registry cache is shared.
 Require Rust tests, amd64 QML tests, and package review for both architectures.
 Use device/real-server testing appropriate to the change and distinguish it
 from an offline demo. Docker commands can outlive an interrupted tool session;
@@ -93,7 +94,7 @@ otherwise use authenticated `gh` or the GitHub API. Create an annotated
 both packages, checksums, source SHA, and notes. With `gh`, use `--verify-tag`
 and `--notes-file`. Verify downloaded assets against the frozen local files.
 
-For OpenStore revision uploads, prefer `clickable publish --arch ARCH` with
+For OpenStore revision uploads, prefer `clickable publish --config ubuntu-touch/clickable.yaml --arch ARCH` with
 `OPENSTORE_API_KEY` from the environment. It selects the package from the build
 directory, so compare it with the frozen artifact before publishing. Read
 [references/openstore.md](references/openstore.md) when inspecting revisions,

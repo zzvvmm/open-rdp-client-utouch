@@ -1,0 +1,9 @@
+.git
+build
+target
+.clickable
+.playwright-mcp
+*.click
+*.log
+.DS_Store
+**/__pycache__

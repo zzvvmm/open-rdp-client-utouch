@@ -11,12 +11,12 @@ import sys
 VERSION = r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
 FIELD = rf'(?P<version>{VERSION})'
 FIELDS = {
-    "Cargo.toml": rf'(?ms)^\[package\]\n(?:(?!^\[).)*?^version = "{FIELD}"',
+    "open-rdp-client/Cargo.toml": rf'(?ms)^\[package\]\n(?:(?!^\[).)*?^version = "{FIELD}"',
     "Cargo.lock": rf'(?m)^name = "rdp-client-ut"\nversion = "{FIELD}"',
-    "CMakeLists.txt": rf'project\(rdp-client-ut VERSION {FIELD} LANGUAGES CXX\)',
-    "manifest.json.in": rf'"version":\s*"{FIELD}"',
-    "qml/pages/SettingsPage.qml": rf'Version {FIELD} • License:',
-    "po/rdp-client-ut.pot": rf'Project-Id-Version: rdp-client-ut\.zzvvmm {FIELD}\\n',
+    "CMakeLists.txt": rf'project\(open-rdp-client VERSION {FIELD} LANGUAGES CXX\)',
+    "ubuntu-touch/packaging/manifest.json.in": rf'"version":\s*"{FIELD}"',
+    "ubuntu-touch/qml/pages/SettingsPage.qml": rf'Version {FIELD} • License:',
+    "ubuntu-touch/po/rdp-client-ut.pot": rf'Project-Id-Version: rdp-client-ut\.zzvvmm {FIELD}\\n',
 }
 
 
@@ -33,7 +33,7 @@ def main():
             parser.error("Versions must be stable X.Y.Z numbers without a v prefix")
 
     root = Path(__file__).resolve().parents[1]
-    if json.loads((root / "manifest.json.in").read_text())["name"] != "rdp-client-ut.zzvvmm":
+    if json.loads((root / "ubuntu-touch/packaging/manifest.json.in").read_text())["name"] != "rdp-client-ut.zzvvmm":
         raise ValueError("Unexpected application ID")
 
     fields = []

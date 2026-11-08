@@ -1,5 +1,7 @@
 # Development and release guide
 
+Linux desktop build/package instructions and acceptance checks are in [LINUX.md](LINUX.md). CI additionally builds and tests Ubuntu 24.04 and Debian 13 `.deb` artifacts. Desktop uses manual package upgrades; the OpenStore publication steps below apply to Ubuntu Touch. Run commands from the repository root.
+
 Use one version, one source commit, and the same two `.click` files for GitHub
 and OpenStore. The commands below run from the repository root. `0.1.4` is an
 example next version; check the repository and both services before choosing it.
@@ -59,8 +61,8 @@ Implement the change, then run checks appropriate to it:
 
 ```bash
 cargo test --locked
-clickable build --arch amd64 --non-interactive
-clickable test --arch amd64 --non-interactive
+clickable build --config ubuntu-touch/clickable.yaml --arch amd64 --non-interactive
+clickable test --config ubuntu-touch/clickable.yaml --arch amd64 --non-interactive
 git diff --check
 ```
 
@@ -129,19 +131,19 @@ The version helper updates only these six application fields:
 
 | File | Version field |
 | --- | --- |
-| `Cargo.toml` | Root package version |
+| `open-rdp-client/Cargo.toml` | Shared Rust package version |
 | `Cargo.lock` | `rdp-client-ut` package version |
 | `CMakeLists.txt` | Project version |
-| `manifest.json.in` | Click package version |
-| `qml/pages/SettingsPage.qml` | About text |
-| `po/rdp-client-ut.pot` | Translation project header |
+| `ubuntu-touch/packaging/manifest.json.in` | Click package version |
+| `ubuntu-touch/qml/pages/SettingsPage.qml` | About text |
+| `ubuntu-touch/po/rdp-client-ut.pot` | Translation project header |
 
 It does not regenerate dependency versions. If the fields disagree, inspect and
 repair the mismatch before bumping.
 
 Write `docs/releases/$RELEASE_VERSION.md` with user-visible changes, relevant
 fixes, and known limitations. Create `docs/releases/` if necessary. These notes
-will be used by both services. Refresh `assets/screenshots/` when the visible UI
+will be used by both services. Refresh `open-rdp-client/assets/screenshots/` when the visible UI
 changes; use real native captures, isolated/demo data, and no credentials. There
 can be at most five OpenStore screenshots. Existing screenshots can stay in
 place when they still represent the app accurately.
@@ -151,8 +153,8 @@ python3 scripts/release-version.py --check --expect "$RELEASE_VERSION"
 cargo test --locked
 git diff --check
 git diff
-git add Cargo.toml Cargo.lock CMakeLists.txt manifest.json.in
-git add qml/pages/SettingsPage.qml po/rdp-client-ut.pot
+git add open-rdp-client/Cargo.toml Cargo.lock CMakeLists.txt ubuntu-touch/packaging/manifest.json.in
+git add ubuntu-touch/qml/pages/SettingsPage.qml ubuntu-touch/po/rdp-client-ut.pot
 git add "docs/releases/$RELEASE_VERSION.md"
 ```
 
@@ -187,28 +189,26 @@ Select the run ID for that exact commit and watch it with
 ID). If no run exists, investigate the workflow trigger before publishing.
 Check all jobs, including both architecture builds.
 
-Build sequentially in one checkout: both architectures share
-`build/cargo-target` and `build/cargo-home`, so parallel local builds can wait
-for locks and invalidate each other's host dependency caches. CI's matrix uses
-separate runners.
+Build sequentially in one checkout: each architecture has its own Cargo target directory under its CMake build,
+while `build/cargo-home` holds the shared registry cache. CI's matrix uses separate runners.
 
 ```bash
 cargo test --locked
-clickable build --arch amd64 --non-interactive
-clickable test --arch amd64 --non-interactive
-clickable build --arch arm64 --non-interactive
+clickable build --config ubuntu-touch/clickable.yaml --arch amd64 --non-interactive
+clickable test --config ubuntu-touch/clickable.yaml --arch amd64 --non-interactive
+clickable build --config ubuntu-touch/clickable.yaml --arch arm64 --non-interactive
 ```
 
 `clickable build` normally includes package review. If you package outside that
-command or use downloaded artifacts, run `clickable review --arch ARCH PATH`
+command or use downloaded artifacts, run `clickable review --config ubuntu-touch/clickable.yaml --arch ARCH PATH`
 for each package and inspect its manifest and architecture. Never bypass a
 review failure to ship a release.
 
 On a connected test device, install and launch the arm64 build when appropriate:
 
 ```bash
-clickable install --arch arm64
-clickable launch --arch arm64
+clickable install --config ubuntu-touch/clickable.yaml --arch arm64
+clickable launch --config ubuntu-touch/clickable.yaml --arch arm64
 ```
 
 Test the changed behavior and basic connection/session controls. Record whether
@@ -288,8 +288,8 @@ cmp "build/x86_64-linux-gnu/app/rdp-client-ut.zzvvmm_${RELEASE_VERSION}_amd64.cl
 cmp "build/aarch64-linux-gnu/app/rdp-client-ut.zzvvmm_${RELEASE_VERSION}_arm64.click" \
   "$RELEASE_DIR/rdp-client-ut.zzvvmm_${RELEASE_VERSION}_arm64.click"
 
-clickable publish --arch amd64 --non-interactive -- "$(cat "docs/releases/$RELEASE_VERSION.md")"
-clickable publish --arch arm64 --non-interactive -- "$(cat "docs/releases/$RELEASE_VERSION.md")"
+clickable publish --config ubuntu-touch/clickable.yaml --arch amd64 --non-interactive -- "$(cat "docs/releases/$RELEASE_VERSION.md")"
+clickable publish --config ubuntu-touch/clickable.yaml --arch arm64 --non-interactive -- "$(cat "docs/releases/$RELEASE_VERSION.md")"
 
 python3 scripts/verify-openstore.py "$RELEASE_VERSION" --packages-dir "$RELEASE_DIR"
 ```
