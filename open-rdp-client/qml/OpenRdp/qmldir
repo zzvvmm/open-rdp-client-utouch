@@ -1,0 +1,5 @@
+module OpenRdp
+AppState 1.0 AppState.qml
+VirtualTrackpad 1.0 VirtualTrackpad.qml
+RdpViewport 1.0 RdpViewport.qml
+RemoteKeyboard 1.0 RemoteKeyboard.qml

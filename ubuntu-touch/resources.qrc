@@ -1,0 +1,21 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="qml/Main.qml">qml/Main.qml</file>
+    <file alias="qml/theme/Theme.qml">qml/theme/Theme.qml</file>
+    <file alias="qml/pages/DevicesPage.qml">qml/pages/DevicesPage.qml</file>
+    <file alias="qml/pages/PcEditorDialog.qml">qml/pages/PcEditorDialog.qml</file>
+    <file alias="qml/pages/AccountsPage.qml">qml/pages/AccountsPage.qml</file>
+    <file alias="qml/pages/SettingsPage.qml">qml/pages/SettingsPage.qml</file>
+    <file alias="qml/pages/SessionPage.qml">qml/pages/SessionPage.qml</file>
+    <file alias="qml/components/PcCard.qml">qml/components/PcCard.qml</file>
+    <file alias="qml/components/RdpViewport.qml">qml/components/RdpViewport.qml</file>
+    <file alias="qml/components/VirtualTrackpad.qml">qml/components/VirtualTrackpad.qml</file>
+    <file alias="qml/components/RemoteKeyboard.qml">qml/components/RemoteKeyboard.qml</file>
+    <file alias="qml/components/PointerControls.qml">qml/components/PointerControls.qml</file>
+    <file alias="qml/components/SessionHudPill.qml">qml/components/SessionHudPill.qml</file>
+    <file alias="qml/components/VirtualKeyBar.qml">qml/components/VirtualKeyBar.qml</file>
+    <file alias="qml/components/CertPromptDialog.qml">qml/components/CertPromptDialog.qml</file>
+    <file alias="qml/components/UpdateManager.qml">qml/components/UpdateManager.qml</file>
+    <file alias="qml/components/UpdatePrompt.qml">qml/components/UpdatePrompt.qml</file>
+  </qresource>
+</RCC>

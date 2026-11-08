@@ -1,0 +1,8 @@
+add_executable(rdp-client-ut qt/main.cpp resources.qrc ${SHARED_DIR}/resources.qrc)
+target_link_libraries(rdp-client-ut PRIVATE rdp-qt)
+install(TARGETS rdp-client-ut RUNTIME DESTINATION .)
+install(FILES packaging/manifest.json.in DESTINATION . RENAME manifest.json)
+install(FILES packaging/rdp-client-ut.desktop.in DESTINATION . RENAME rdp-client-ut.desktop)
+install(FILES packaging/rdp-client-ut.apparmor DESTINATION .)
+install(FILES ${SHARED_DIR}/assets/logo.svg DESTINATION assets)
+install(FILES ${CMAKE_SOURCE_DIR}/LICENSE DESTINATION .)

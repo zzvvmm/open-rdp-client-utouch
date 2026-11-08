@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Build the pure-Rust IronRDP backend static library for the target Ubuntu Touch architecture."""
+"""Build the pure-Rust IronRDP backend static library for the selected frontend and architecture."""
 import os
 import subprocess
 import sys
 
-target_dir, rust_target, cxx_compiler = sys.argv[1:4]
+target_dir, rust_target, cxx_compiler, feature, profile = sys.argv[1:6]
 env = dict(os.environ)
 env.pop("MAKEFLAGS", None)
 env.pop("CARGO_MAKEFLAGS", None)
@@ -31,9 +31,15 @@ cmd = [
     "cargo",
     "build",
     "--locked",
-    "--release",
+    "--package",
+    "rdp-client-ut",
+    "--no-default-features",
+    "--features",
+    feature,
     "--lib",
     "--target",
     rust_target,
 ]
+if profile == "release":
+    cmd.append("--release")
 subprocess.run(cmd, env=env, check=True)

@@ -1,23 +1,26 @@
-name: CI & Click Package Build
+name: Build & Test
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   rust-tests:
-    name: Rust Unit & Integration Tests
+    name: Rust tests (${{ matrix.platform }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [linux-desktop, ubuntu-touch]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Run Cargo Tests
-        run: cargo test --locked
+      - run: cargo test --locked --workspace --no-default-features --features ${{ matrix.platform }}
+      - run: python3 scripts/release-version.py --check
 
   click-packages:
-    name: Build Ubuntu Touch Click Packages (amd64 & arm64)
+    name: Ubuntu Touch (${{ matrix.arch }})
     runs-on: ubuntu-latest
     env:
       CLICKABLE_DOCKER_COMMAND: docker
@@ -26,15 +29,40 @@ jobs:
         arch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v4
-      - name: Install Clickable
-        run: pipx install clickable-ut
-      - name: Build Click Package (${{ matrix.arch }})
-        run: clickable build --arch ${{ matrix.arch }} --non-interactive
-      - name: Run QML Interaction Tests
+      - run: pipx install clickable-ut
+      - run: clickable build --config ubuntu-touch/clickable.yaml --arch ${{ matrix.arch }} --non-interactive
+      - name: Run Lomiri and shared QML tests
         if: matrix.arch == 'amd64'
-        run: clickable test --arch amd64 --non-interactive
-      - name: Upload Click Artifact
-        uses: actions/upload-artifact@v4
+        run: clickable test --config ubuntu-touch/clickable.yaml --arch amd64 --non-interactive
+      - uses: actions/upload-artifact@v4
         with:
           name: click-package-${{ matrix.arch }}
           path: build/*/app/*.click
+
+  linux-packages:
+    name: Linux desktop (${{ matrix.flavor }}, amd64)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - flavor: ubuntu24
+            distro: ubuntu:24.04
+          - flavor: debian13
+            distro: debian:13
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare distribution build environment
+        run: docker build -f linux/packaging/Dockerfile --build-arg DISTRO=${{ matrix.distro }} -t open-rdp-build .
+      - name: Build, test, and package
+        run: docker run --rm -v "$PWD:/work" open-rdp-build sh scripts/build-linux-ci.sh ${{ matrix.flavor }}
+      - name: Verify installed package in a clean runtime environment
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work ${{ matrix.distro }} sh -ec '
+            apt-get update
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 xvfb xauth /work/build/linux-${{ matrix.flavor }}/packages/*.deb
+            xvfb-run -a env QT_QUICK_BACKEND=software python3 scripts/smoke-linux.py
+          '
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.flavor }}-amd64
+          path: build/linux-${{ matrix.flavor }}/packages/*.deb

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Open RDP Client
+Comment=Connect to Windows and Linux remote desktops
+Exec=open-rdp-client
+Icon=open-rdp-client
+Terminal=false
+Categories=Network;RemoteAccess;
+Keywords=RDP;Remote Desktop;Windows;
+StartupNotify=true
+StartupWMClass=open-rdp-client

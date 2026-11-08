@@ -1,0 +1,23 @@
+set(CPACK_GENERATOR DEB)
+set(CPACK_PACKAGE_DIRECTORY "${CMAKE_BINARY_DIR}/packages")
+set(CPACK_PACKAGE_NAME open-rdp-client)
+set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+set(CPACK_PACKAGE_CONTACT "DD <zzvvmm96@gmail.com>")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Remote Desktop client powered by IronRDP and Qt Quick")
+set(CPACK_PACKAGE_DESCRIPTION "Connect to Windows and xrdp desktops with NLA authentication, certificate verification, saved PCs, clipboard synchronization, audio, and dynamic resolution.")
+set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/zzvvmm/open-rdp-client-utouch")
+set(CPACK_PACKAGING_INSTALL_PREFIX /usr)
+set(CPACK_DEBIAN_PACKAGE_SECTION net)
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "ca-certificates, qml6-module-qtquick, qml6-module-qtquick-controls, qml6-module-qtquick-layouts, qml6-module-qtquick-templates, qml6-module-qtquick-window, qml6-module-qtqml-workerscript, qt6-wayland, libqt6svg6")
+set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+
+# Qt 6.7+ distributions split the SVG image plugin from libqt6svg6.
+find_program(APT_CACHE_EXECUTABLE apt-cache)
+if(APT_CACHE_EXECUTABLE)
+    execute_process(COMMAND ${APT_CACHE_EXECUTABLE} show qt6-svg-plugins
+        RESULT_VARIABLE SVG_PLUGIN_PACKAGE OUTPUT_QUIET ERROR_QUIET)
+    if(SVG_PLUGIN_PACKAGE EQUAL 0)
+        string(APPEND CPACK_DEBIAN_PACKAGE_DEPENDS ", qt6-svg-plugins")
+    endif()
+endif()

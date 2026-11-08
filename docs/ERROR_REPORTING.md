@@ -15,7 +15,7 @@ Organization: `dd-0q`, team: `dd`.
 | [open-rdp-client-utouch-backend](https://dd-0q.sentry.io/settings/projects/open-rdp-client-utouch-backend/) | Rust panics and unexpected RDP failures |
 | [open-rdp-client-utouch-ui](https://dd-0q.sentry.io/settings/projects/open-rdp-client-utouch-ui/) | QML reference/type/binding/load errors and Qt critical/fatal messages |
 
-The public client DSNs are in [`sentry.json`](../sentry.json), embedded in the
+The public client DSNs are in [`open-rdp-client/sentry.json`](../open-rdp-client/sentry.json), embedded in the
 Rust backend at build time. These keys allow event submission; they are not
 account/API authentication tokens. No Sentry auth token is required on a phone.
 Never put a Sentry account token in that file or in the application package.
@@ -67,7 +67,7 @@ Run the normal unit and QML checks:
 
 ```bash
 cargo test --locked
-clickable test --arch amd64 --non-interactive
+clickable test --config ubuntu-touch/clickable.yaml --arch amd64 --non-interactive
 ```
 
 For an explicit backend delivery check, use isolated data so it does not change
@@ -100,3 +100,7 @@ available for inspection and can be resolved manually.
 
 Reference: [Sentry Rust SDK](https://docs.sentry.io/platforms/rust/),
 [Rust native crash-reporting scope](https://docs.sentry.io/platforms/rust/native-crash-reporting/).
+
+## Platform split
+
+The same scrubbed Rust/UI reporting pipeline is used by both frontends. Events include an allowlisted `app.platform` tag (`linux` or `ubuntu-touch`). Source locations are normalized to repository-owned Rust, Qt, and packaged QML paths after the directory split; absolute paths outside the checkout and unshipped QML paths are discarded. The desktop settings switch and Ubuntu Touch settings switch apply independently because each platform uses its own XDG storage identity.

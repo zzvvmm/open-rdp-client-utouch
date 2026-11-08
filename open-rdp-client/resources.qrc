@@ -1,0 +1,15 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="assets/logo.svg">assets/logo.svg</file>
+    <file alias="assets/icons/keyboard.svg">assets/icons/keyboard.svg</file>
+    <file alias="assets/icons/certificate.svg">assets/icons/certificate.svg</file>
+    <file alias="assets/icons/pc-card.svg">assets/icons/pc-card.svg</file>
+    <file alias="assets/icons/trackpad.svg">assets/icons/trackpad.svg</file>
+    <file alias="assets/icons/direct-touch.svg">assets/icons/direct-touch.svg</file>
+    <file alias="OpenRdp/qmldir">qml/OpenRdp/qmldir</file>
+    <file alias="OpenRdp/RdpViewport.qml">qml/OpenRdp/RdpViewport.qml</file>
+    <file alias="OpenRdp/AppState.qml">qml/OpenRdp/AppState.qml</file>
+    <file alias="OpenRdp/RemoteKeyboard.qml">qml/OpenRdp/RemoteKeyboard.qml</file>
+    <file alias="OpenRdp/VirtualTrackpad.qml">qml/OpenRdp/VirtualTrackpad.qml</file>
+  </qresource>
+</RCC>
