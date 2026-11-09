@@ -1,4 +1,8 @@
 module OpenRdp
+singleton Design 1.0 Design.qml
+ActionButton 1.0 ActionButton.qml
+PcLibrary 1.0 PcLibrary.qml
+PcTile 1.0 PcTile.qml
 AppState 1.0 AppState.qml
 VirtualTrackpad 1.0 VirtualTrackpad.qml
 RdpViewport 1.0 RdpViewport.qml

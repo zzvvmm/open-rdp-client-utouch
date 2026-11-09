@@ -35,13 +35,28 @@ For a native Wayland session:
 QT_QPA_PLATFORM=wayland python3 scripts/smoke-linux.py
 ```
 
+Capture the PC library and connected demo with deterministic sample PCs:
+
+```bash
+xvfb-run -a env QT_QUICK_BACKEND=software python3 scripts/smoke-linux.py \
+  --theme light --layout list --size 1100x760 --library-fixture \
+  --snapshot-prefix build/ui/linux/light-list
+```
+
+The harness accepts `--executable` for an uninstalled build. Ubuntu Touch uses
+`--platform ubuntu-touch --executable build/x86_64-linux-gnu/app/install/rdp-client-ut`;
+run it inside Clickable with Xvfb/Mesa, as `clickable test` does. A prefix produces
+`-dashboard.png` and `-session.png` files. Use `--font-scale 1.5` to exercise
+larger application fonts independently of display scaling. CI attaches these screenshots separately
+from release package artifacts.
+
 The demo checks startup, imports, resources, painting, and application/backend integration. It does not establish real-server interoperability or validate sound and clipboard exchange with other applications.
 
 ## Interactive acceptance checks
 
 Before release, record the distribution, desktop environment, display protocol, server, and whether a physical Ubuntu Touch device was used.
 
-1. Create, edit, search, favorite, duplicate, and delete PCs. Reopen the application and verify persistence and thumbnails.
+1. Create, edit, search, favorite, duplicate, and delete PCs. Check Recent, sorting, layout persistence, combined group/search filters, and group rename/removal. Try Quick Connect, save a temporary PC, reject invalid saves, and use Save & Connect. Reopen the application and verify persistence and thumbnails.
 2. Add and edit accounts, retain a password when editing with a blank password, connect using saved credentials, and exercise the ask-every-time dialog. Confirm password fields clear after use.
 3. Connect to Windows and xrdp using NLA. Check trust-once, trust-always, rejection, certificate changes, and revocation. Credentials must not be sent before certificate approval.
 4. Check physical keyboard input, held modifiers, Escape, Tab, shortcuts, mouse buttons, dragging, and scrolling. Open a dialog, switch applications, and end a session while input is held; no remote key or button should remain held.
@@ -60,11 +75,11 @@ The publishing job uses the repository's built-in `GITHUB_TOKEN`. It creates a G
 
 Desktop users continue to install `.deb` upgrades manually. OpenStore publication and APT repository hosting remain separate workflows.
 
-## Validation recorded for this port
+## Validation recorded for the library upgrade
 
-- Rust: 53 unit tests and the storage-isolation integration test pass with each platform feature. Conflicting platform features are rejected.
-- Qt 6: all three CTest suites pass on Ubuntu 24.04 (Qt 6.4.2) and Debian 13 (Qt 6.8.2). The dashboard search test and full-window credential/certificate/fullscreen tests also pass on both versions.
-- Qt 5: 71 Lomiri QML checks, including full-window state/dispatch integration, plus five shared QML checks pass. The native Ubuntu Touch amd64 application starts under Xvfb without QML errors.
+- Rust: 59 unit tests and the storage-isolation integration test pass with each platform feature. Conflicting platform features are rejected.
+- Qt 6: all three CTest suites pass on Ubuntu 24.04 (Qt 6.4.2) and Debian 13 (Qt 6.8.2). Each run reports five native-input checks, 15 desktop workflow/window checks, and 16 shared checks, including Quick Connect, rejected saves, Save & Connect, certificate prompts, and fullscreen.
+- Qt 5: 79 Lomiri QML checks plus 16 shared checks pass. Native amd64 demo checks cover light/dark portrait, compact landscape, list layout, and enlarged text under Xvfb/Mesa.
 - Packages: Ubuntu and Debian amd64 `.deb` files install and render the offline demo in fresh runtime containers with only declared runtime dependencies and test tools. Ubuntu Touch amd64 and arm64 `.click` packages both pass Clickable review.
 - Rendering: the desktop demo renders with X11/OpenGL under Xvfb/Mesa and through the Wayland platform plugin under nested Weston with an input seat. These are virtual display environments.
-- Real Windows/xrdp server connections, clipboard/audio exchange with external applications, and physical Ubuntu Touch hardware remain unverified for this port.
+- Real Windows/xrdp server connections, clipboard/audio exchange with external applications, and physical Ubuntu Touch hardware remain unverified for this upgrade. These checks still require release-time validation with a real server and device.

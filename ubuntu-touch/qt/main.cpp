@@ -1,5 +1,7 @@
 #include "RdpBridge.h"
 #include "RdpCanvasItem.h"
+#include "SmokeTest.h"
+#include <QQuickItem>
 
 #include <QGuiApplication>
 #include <QQmlContext>
@@ -9,6 +11,7 @@
 
 int main(int argc, char *argv[]) {
     QGuiApplication app(argc, argv);
+    configureSmokeFont(app);
     app.setApplicationName(QStringLiteral("rdp-client-ut.zzvvmm"));
     app.setApplicationDisplayName(QStringLiteral("Open RDP Client"));
     app.setOrganizationName(QStringLiteral("rdp-client-ut.zzvvmm"));
@@ -39,5 +42,6 @@ int main(int argc, char *argv[]) {
     view.resize(450, 820);
     view.show();
 
+    configureSmokeTest(app, bridge, view.rootObject(), &view);
     return app.exec();
 }

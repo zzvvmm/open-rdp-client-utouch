@@ -18,6 +18,7 @@ FocusScope {
     readonly property int viewportHeight: Math.round(viewport.height)
     property alias remoteInput: hardware
     property alias viewportItem: viewport
+    signal savePcRequested
     signal fullscreenRequested
     function refreshCanvas() {
         viewport.refreshCanvas();
@@ -103,14 +104,20 @@ FocusScope {
                         root.releaseInput();
                     }
                 }
+                Button {
+                    visible: root.appState.temporarySession
+                    text: qsTr("Save PC")
+                    onClicked: root.savePcRequested()
+                }
                 Label {
                     Layout.fillWidth: true
+                    Layout.minimumWidth: 0
                     text: root.appState.activePcTitle
                     elide: Text.ElideRight
                     textFormat: Text.PlainText
                 }
                 Label {
-                    visible: !!root.appState.appSettings.showStatsOverlay
+                    visible: !!root.appState.appSettings.showStatsOverlay && root.width > 1050
                     text: root.appState.remoteWidth + "×" + root.appState.remoteHeight + " · " + root.appState.currentFps + " FPS"
                 }
                 ComboBox {
@@ -302,13 +309,19 @@ FocusScope {
                         wrapMode: Text.Wrap
                         Layout.maximumWidth: 500
                     }
+                    BusyIndicator {
+                        running: root.appState.sessionStage !== "error" && root.appState.sessionStage !== "disconnected"
+                        visible: running
+                    }
+                    Button {
+                        visible: root.appState.sessionStage === "error"
+                        text: qsTr("Retry")
+                        onClicked: root.appState.retryConnection()
+                    }
                     Button {
                         text: root.appState.sessionStage === "error" ? qsTr("Back to PCs") : qsTr("Cancel")
                         onClicked: {
-                            root.appState.sendAction({
-                                    "action": "disconnect_session"
-                                });
-                            root.appState.inSessionView = false;
+                            root.appState.cancelConnection();
                         }
                     }
                 }

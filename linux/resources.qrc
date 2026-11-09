@@ -1,6 +1,7 @@
 <RCC>
   <qresource prefix="/">
     <file alias="qml/AccountsPage.qml">qml/AccountsPage.qml</file>
+    <file alias="qml/QuickConnectDialog.qml">qml/QuickConnectDialog.qml</file>
     <file alias="qml/CertificateDialog.qml">qml/CertificateDialog.qml</file>
     <file alias="qml/DevicesPage.qml">qml/DevicesPage.qml</file>
     <file alias="qml/Main.qml">qml/Main.qml</file>

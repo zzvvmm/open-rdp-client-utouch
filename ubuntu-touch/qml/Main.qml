@@ -49,9 +49,43 @@ MainView {
     property alias toastMessage: appState.toastMessage
     property alias isDarkMode: appState.isDarkMode
 
-    function sendAction(payload) { appState.sendAction(payload) }
-    function showToast(message) { appState.showToast(message) }
-    function connectToProfile(id, username, password) { appState.connectToProfile(id, username, password) }
+    // Lomiri owns its application font; exercise shared text scaling separately.
+    function applySmokeFontScale(scale) { Shared.Design.fontScale = scale }
+    function startDemo() {
+        for (var i = 0; i < appState.profilesList.length; ++i) {
+            if (appState.profilesList[i].isDemo) {
+                appState.connectToProfile(appState.profilesList[i].id, "", "");
+                return;
+            }
+        }
+    }
+    function acceptDemoCertificate() {
+        if (appState.pendingCertPrompt && appState.pendingCertPrompt.host === "demo.local") {
+            appState.sendAction({
+                    "action": "respond_certificate",
+                    "decision": "trust_once"
+                });
+            appState.pendingCertPrompt = null;
+        }
+    }
+    function sendAction(payload) {
+        appState.sendAction(payload);
+    }
+    function showToast(message) {
+        appState.showToast(message);
+    }
+    function connectToProfile(id, username, password) {
+        appState.connectToProfile(id, username, password);
+    }
+    Binding {
+        target: Shared.Design
+        property: "darkMode"
+        value: mainView.isDarkMode
+    }
+    Shared.PcLibrary {
+        id: library
+        profiles: mainView.profilesList
+    }
     Shared.AppState {
         id: appState
         bridge: RdpBridge
@@ -69,16 +103,17 @@ MainView {
         skippedVersion: mainView.appSettings.skippedUpdateVersion || ""
         lastCheckedAt: mainView.appSettings.lastUpdateCheckEpoch || 0
         appActive: Qt.application.state === Qt.ApplicationActive
-        canPrompt: !mainView.inSessionView && !mainView.showCredPrompt
-                   && mainView.pendingCertPrompt === null && !pcEditor.visible
+        canPrompt: !mainView.inSessionView && !mainView.showCredPrompt && mainView.pendingCertPrompt === null && !pcEditor.visible && !connectionDialogs.visible && !devices.filtersVisible
         onSavePreferences: {
-            var payload = { action: "save_settings" }
-            for (var key in patch) payload[key] = patch[key]
-            mainView.sendAction(payload)
+            var payload = {
+                "action": "save_settings"
+            };
+            for (var key in patch)
+                payload[key] = patch[key];
+            mainView.sendAction(payload);
         }
         onOpenStoreRequested: updates.storeOpened(Qt.openUrlExternally(uri))
     }
-
 
     Rectangle {
         anchors.fill: parent
@@ -140,23 +175,23 @@ MainView {
                 spacing: units.gu(1)
 
                 Button {
-                    visible: mainView.activeProfileId.length > 0
-                    text: i18n.tr("Return to Session")
+                    visible: appState.hasActiveSession
+                    text: "↗"
+                    width: Math.max(48, units.gu(6))
+                    height: Math.max(48, units.gu(6))
+                    Accessible.name: i18n.tr("Return to session")
                     color: "#0D9488"
                     onClicked: mainView.inSessionView = true
                 }
 
                 Button {
-                    text: i18n.tr("+ Add PC")
+                    text: "+"
+                    width: Math.max(48, units.gu(6))
+                    height: Math.max(48, units.gu(6))
+                    Accessible.name: i18n.tr("Add PC")
                     color: "#0078D4"
                     onClicked: {
-                        pcEditor.openForNew(
-                            mainView.appSettings.defaultResolution,
-                            mainView.appSettings.defaultScaleFactor,
-                            mainView.appSettings.defaultTouchMode,
-                            mainView.appSettings.defaultAudioMode,
-                            mainView.appSettings.defaultClipboardEnabled
-                        )
+                        pcEditor.openForNew(mainView.appSettings.defaultResolution, mainView.appSettings.defaultScaleFactor, mainView.appSettings.defaultTouchMode, mainView.appSettings.defaultAudioMode, mainView.appSettings.defaultClipboardEnabled);
                     }
                 }
             }
@@ -171,6 +206,18 @@ MainView {
             anchors.bottom: bottomNav.top
 
             DevicesPage {
+                id: devices
+                settings: mainView.appSettings
+                sessionStage: mainView.sessionStage
+                onQuickConnectRequested: connectionDialogs.openQuick()
+                onDispatchAction: {
+                    if (payload.action === "rename_group" || payload.action === "remove_group")
+                        appState.submitAction(payload, function (result) {
+                                devices.completeAction(result);
+                            });
+                    else
+                        mainView.sendAction(payload);
+                }
                 anchors.fill: parent
                 visible: mainView.currentTab === "pcs"
                 profiles: mainView.profilesList
@@ -179,30 +226,42 @@ MainView {
 
                 onConnectPc: mainView.connectToProfile(pcId, "", "")
                 onAddPcRequested: {
-                    pcEditor.openForNew(
-                        mainView.appSettings.defaultResolution,
-                        mainView.appSettings.defaultScaleFactor,
-                        mainView.appSettings.defaultTouchMode,
-                        mainView.appSettings.defaultAudioMode,
-                        mainView.appSettings.defaultClipboardEnabled
-                    )
+                    pcEditor.openForNew(mainView.appSettings.defaultResolution, mainView.appSettings.defaultScaleFactor, mainView.appSettings.defaultTouchMode, mainView.appSettings.defaultAudioMode, mainView.appSettings.defaultClipboardEnabled);
                 }
                 onEditPcRequested: pcEditor.openForEdit(pcData)
-                onDuplicatePcRequested: mainView.sendAction({ action: "duplicate_pc", id: pcId })
-                onDeletePcRequested: mainView.sendAction({ action: "delete_pc", id: pcId })
-                onFavoriteToggled: mainView.sendAction({ action: "toggle_favorite_pc", id: pcId })
+                onDuplicatePcRequested: mainView.sendAction({
+                        "action": "duplicate_pc",
+                        "id": pcId
+                    })
+                onDeletePcRequested: mainView.sendAction({
+                        "action": "delete_pc",
+                        "id": pcId
+                    })
+                onFavoriteToggled: mainView.sendAction({
+                        "action": "toggle_favorite_pc",
+                        "id": pcId
+                    })
             }
 
             AccountsPage {
+                id: accountsPage
                 anchors.fill: parent
                 visible: mainView.currentTab === "accounts"
                 accounts: mainView.accountsList
                 knownCerts: mainView.knownCertsList
                 darkMode: mainView.isDarkMode
 
-                onSaveAccount: mainView.sendAction(payload)
-                onDeleteAccount: mainView.sendAction({ action: "delete_account", id: accountId })
-                onRemoveKnownCert: mainView.sendAction({ action: "remove_known_cert", hostPort: hostPort })
+                onSaveAccount: appState.submitAction(payload, function (result) {
+                        accountsPage.completeSave(result);
+                    })
+                onDeleteAccount: mainView.sendAction({
+                        "action": "delete_account",
+                        "id": accountId
+                    })
+                onRemoveKnownCert: mainView.sendAction({
+                        "action": "remove_known_cert",
+                        "hostPort": hostPort
+                    })
             }
 
             SettingsPage {
@@ -237,11 +296,19 @@ MainView {
                 anchors.fill: parent
 
                 Repeater {
-                    model: [
-                        { id: "pcs", label: i18n.tr("PCs"), icon: "computer-symbolic" },
-                        { id: "accounts", label: i18n.tr("Accounts & Certs"), icon: "contact" },
-                        { id: "settings", label: i18n.tr("Settings"), icon: "settings" }
-                    ]
+                    model: [{
+                            "id": "pcs",
+                            "label": i18n.tr("PCs"),
+                            "icon": "computer-symbolic"
+                        }, {
+                            "id": "accounts",
+                            "label": i18n.tr("Accounts & Certs"),
+                            "icon": "contact"
+                        }, {
+                            "id": "settings",
+                            "label": i18n.tr("Settings"),
+                            "icon": "settings"
+                        }]
                     delegate: AbstractButton {
                         width: bottomNav.width / 3
                         height: bottomNav.height
@@ -256,9 +323,7 @@ MainView {
                                 width: units.gu(2.4)
                                 height: units.gu(2.4)
                                 name: modelData.icon
-                                color: mainView.currentTab === modelData.id
-                                       ? "#0078D4"
-                                       : (mainView.isDarkMode ? "#9BA7B8" : "#5A6577")
+                                color: mainView.currentTab === modelData.id ? "#0078D4" : (mainView.isDarkMode ? "#9BA7B8" : "#5A6577")
                             }
 
                             Label {
@@ -266,9 +331,7 @@ MainView {
                                 text: modelData.label
                                 fontSize: "x-small"
                                 font.bold: mainView.currentTab === modelData.id
-                                color: mainView.currentTab === modelData.id
-                                       ? "#0078D4"
-                                       : (mainView.isDarkMode ? "#9BA7B8" : "#5A6577")
+                                color: mainView.currentTab === modelData.id ? "#0078D4" : (mainView.isDarkMode ? "#9BA7B8" : "#5A6577")
                             }
                         }
                     }
@@ -299,6 +362,10 @@ MainView {
             shiftState: mainView.shiftState
             winState: mainView.winState
             pendingCert: mainView.pendingCertPrompt
+            blocked: mainView.showCredPrompt || pcEditor.visible || connectionDialogs.visible
+            temporarySession: appState.temporarySession
+            onSavePcRequested: connectionDialogs.openSave()
+            onRetryRequested: appState.retryConnection()
 
             onDispatchAction: mainView.sendAction(payload)
             onExitSessionView: mainView.inSessionView = false
@@ -309,7 +376,18 @@ MainView {
             id: pcEditor
             darkMode: mainView.isDarkMode
             accounts: mainView.accountsList
-            onSaveRequested: mainView.sendAction(payload)
+            groups: library.groupNames
+            onSaveRequested: appState.submitAction(payload, function (result) {
+                    pcEditor.completeSave(result);
+                })
+            onConnectRequested: mainView.connectToProfile(pcId, "", "")
+        }
+
+        ConnectionDialogs {
+            id: connectionDialogs
+            appState: appState
+            accounts: mainView.accountsList
+            groups: library.groupNames
         }
 
         UpdatePrompt {
@@ -333,7 +411,8 @@ MainView {
 
             MouseArea {
                 anchors.fill: parent
-                onClicked: {}
+                onClicked: {
+                }
             }
 
             Rectangle {
@@ -391,7 +470,7 @@ MainView {
                             width: (parent.width - units.gu(1.2)) / 2
                             text: i18n.tr("Cancel")
                             color: mainView.isDarkMode ? "#263042" : "#E2E8F0"
-                            onClicked: mainView.showCredPrompt = false
+                            onClicked: appState.cancelCredentials()
                         }
 
                         Button {
@@ -399,13 +478,9 @@ MainView {
                             text: i18n.tr("Connect")
                             color: "#0078D4"
                             onClicked: {
-                                if (mainView.credUsername.trim().length === 0) return
-                                mainView.showCredPrompt = false
-                                mainView.connectToProfile(
-                                    mainView.credProfileId,
-                                    mainView.credUsername.trim(),
-                                    mainView.credPassword
-                                )
+                                if (mainView.credUsername.trim().length === 0)
+                                    return;
+                                appState.submitCredentials();
                             }
                         }
                     }
@@ -430,11 +505,11 @@ MainView {
             Label {
                 id: toastLbl
                 anchors.centerIn: parent
+                textFormat: Text.PlainText
                 text: mainView.toastMessage
                 fontSize: "small"
                 color: "#FCA5A5"
             }
-
         }
     }
 }

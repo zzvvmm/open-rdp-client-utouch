@@ -7,16 +7,29 @@ use crate::models::{
     AudioRedirectionMode, CertStore, PcProfile, ResolutionMode, TouchInputMode, UserAccount,
 };
 
-pub use crate::platform::{APP_ID, APP_FRAMEWORK};
+pub use crate::platform::{APP_FRAMEWORK, APP_ID};
 
 fn automatic_updates_enabled() -> bool {
     true
 }
 
-fn error_reporting_enabled() -> bool { true }
+fn error_reporting_enabled() -> bool {
+    true
+}
+
+fn library_layout() -> String {
+    "grid".into()
+}
+fn library_sort() -> String {
+    "name".into()
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AppSettings {
+    #[serde(default = "library_layout")]
+    pub library_layout: String,
+    #[serde(default = "library_sort")]
+    pub library_sort: String,
     #[serde(default)]
     pub connection_defaults_revision: u32,
     pub theme_mode: String, // "dark", "light", "system"
@@ -43,6 +56,8 @@ pub struct AppSettings {
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
+            library_layout: library_layout(),
+            library_sort: library_sort(),
             connection_defaults_revision: 1,
             theme_mode: "dark".to_string(),
             default_resolution: ResolutionMode::default(),
@@ -177,9 +192,23 @@ mod tests {
     use tempfile::tempdir;
 
     #[test]
+    fn existing_settings_get_library_defaults_without_losing_preferences() {
+        let mut legacy = serde_json::to_value(AppSettings::default()).unwrap();
+        let object = legacy.as_object_mut().unwrap();
+        object.remove("library_layout");
+        object.remove("library_sort");
+        object.insert("theme_mode".into(), serde_json::json!("light"));
+        let settings: AppSettings = serde_json::from_value(legacy).unwrap();
+        assert_eq!(settings.library_layout, "grid");
+        assert_eq!(settings.library_sort, "name");
+        assert_eq!(settings.theme_mode, "light");
+    }
+
+    #[test]
     fn error_reporting_defaults_on_and_opt_out_survives_restart() {
         let dir = tempdir().unwrap();
-        let db = StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
+        let db =
+            StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
         let mut legacy = serde_json::to_value(AppSettings::default()).unwrap();
         legacy.as_object_mut().unwrap().remove("report_errors");
         legacy["theme_mode"] = serde_json::json!("light");
@@ -188,7 +217,8 @@ mod tests {
         assert_eq!(settings.theme_mode, "light");
         settings.report_errors = false;
         db.save_settings(&settings).unwrap();
-        let reopened = StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
+        let reopened =
+            StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
         assert!(!reopened.load_settings().report_errors);
     }
 
@@ -199,7 +229,10 @@ mod tests {
         let cache = dir.path().join("cache");
         let db = StorageDatabase::open_at(config.clone(), cache.clone()).unwrap();
         let mut legacy = serde_json::to_value(AppSettings::default()).unwrap();
-        legacy.as_object_mut().unwrap().remove("connection_defaults_revision");
+        legacy
+            .as_object_mut()
+            .unwrap()
+            .remove("connection_defaults_revision");
         legacy["default_resolution"] = serde_json::json!({"mode":"dynamic"});
         legacy["default_touch_mode"] = serde_json::json!("mouse_pointer");
         legacy["report_errors"] = serde_json::json!(false);
@@ -226,8 +259,12 @@ mod tests {
     #[test]
     fn native_resolution_defaults_preserve_saved_dynamic_choices() {
         let dir = tempdir().unwrap();
-        let db = StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
-        assert_eq!(db.load_settings().default_resolution, ResolutionMode::Native);
+        let db =
+            StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
+        assert_eq!(
+            db.load_settings().default_resolution,
+            ResolutionMode::Native
+        );
         let profile = PcProfile::new("host-01", "").unwrap();
         assert_eq!(profile.resolution_mode, ResolutionMode::Native);
         let mut legacy = serde_json::to_value(AppSettings::default()).unwrap();
@@ -236,7 +273,10 @@ mod tests {
         assert_eq!(settings.default_resolution, ResolutionMode::Native);
         settings.default_resolution = ResolutionMode::Dynamic;
         db.save_settings(&settings).unwrap();
-        assert_eq!(db.load_settings().default_resolution, ResolutionMode::Dynamic);
+        assert_eq!(
+            db.load_settings().default_resolution,
+            ResolutionMode::Dynamic
+        );
         let mut profile = profile;
         profile.resolution_mode = ResolutionMode::Dynamic;
         profile.default_touch_mode = TouchInputMode::MousePointer;
@@ -246,17 +286,38 @@ mod tests {
 
     #[test]
     fn touch_defaults_preserve_saved_trackpad_choices() {
-        assert_eq!(AppSettings::default().default_touch_mode, TouchInputMode::DirectTouch);
+        assert_eq!(
+            AppSettings::default().default_touch_mode,
+            TouchInputMode::DirectTouch
+        );
         let mut settings = serde_json::to_value(AppSettings::default()).unwrap();
-        settings.as_object_mut().unwrap().remove("default_touch_mode");
-        assert_eq!(serde_json::from_value::<AppSettings>(settings.clone()).unwrap().default_touch_mode, TouchInputMode::DirectTouch);
+        settings
+            .as_object_mut()
+            .unwrap()
+            .remove("default_touch_mode");
+        assert_eq!(
+            serde_json::from_value::<AppSettings>(settings.clone())
+                .unwrap()
+                .default_touch_mode,
+            TouchInputMode::DirectTouch
+        );
         settings["default_touch_mode"] = serde_json::json!("mouse_pointer");
-        assert_eq!(serde_json::from_value::<AppSettings>(settings).unwrap().default_touch_mode, TouchInputMode::MousePointer);
+        assert_eq!(
+            serde_json::from_value::<AppSettings>(settings)
+                .unwrap()
+                .default_touch_mode,
+            TouchInputMode::MousePointer
+        );
         let profile = PcProfile::new("host-01", "").unwrap();
         assert_eq!(profile.default_touch_mode, TouchInputMode::DirectTouch);
         let mut saved = serde_json::to_value(profile).unwrap();
         saved["default_touch_mode"] = serde_json::json!("mouse_pointer");
-        assert_eq!(serde_json::from_value::<PcProfile>(saved).unwrap().default_touch_mode, TouchInputMode::MousePointer);
+        assert_eq!(
+            serde_json::from_value::<PcProfile>(saved)
+                .unwrap()
+                .default_touch_mode,
+            TouchInputMode::MousePointer
+        );
     }
 
     #[test]
@@ -296,11 +357,8 @@ mod tests {
     #[test]
     fn test_storage_crud_roundtrip() {
         let dir = tempdir().unwrap();
-        let db = StorageDatabase::open_at(
-            dir.path().join("config"),
-            dir.path().join("cache"),
-        )
-        .unwrap();
+        let db =
+            StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
 
         let pc = PcProfile::new("192.168.1.42:3389", "Home Gaming PC").unwrap();
         db.save_profiles(std::slice::from_ref(&pc)).unwrap();

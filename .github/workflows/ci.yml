@@ -63,6 +63,12 @@ jobs:
           name: click-package-${{ matrix.arch }}
           path: build/*/app/*.click
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: matrix.arch == 'amd64'
+        with:
+          name: ui-ubuntu-touch
+          path: build/ui/ubuntu-touch/*.png
+          if-no-files-found: error
 
   linux-packages:
     name: Linux desktop (${{ matrix.flavor }}, amd64)
@@ -86,12 +92,20 @@ jobs:
           docker run --rm -v "$PWD:/work" -w /work ${{ matrix.distro }} sh -ec '
             apt-get update
             DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 xvfb xauth /work/build/linux-${{ matrix.flavor }}/packages/*.deb
-            xvfb-run -a env QT_QUICK_BACKEND=software python3 scripts/smoke-linux.py
+            xvfb-run -a env QT_QUICK_BACKEND=software python3 scripts/smoke-linux.py --library-fixture --snapshot-prefix build/ui/linux-${{ matrix.flavor }}/dark-grid
+            xvfb-run -a env QT_QUICK_BACKEND=software python3 scripts/smoke-linux.py --theme light --size 800x600 --library-fixture --snapshot-prefix build/ui/linux-${{ matrix.flavor }}/light-minimum
+            xvfb-run -a env QT_QUICK_BACKEND=software python3 scripts/smoke-linux.py --theme light --layout list --library-fixture --snapshot-prefix build/ui/linux-${{ matrix.flavor }}/light-list
+            xvfb-run -a env QT_QUICK_BACKEND=software python3 scripts/smoke-linux.py --theme light --layout list --font-scale 1.5 --library-fixture --snapshot-prefix build/ui/linux-${{ matrix.flavor }}/large-text
           '
       - uses: actions/upload-artifact@v4
         with:
           name: linux-${{ matrix.flavor }}-amd64
           path: build/linux-${{ matrix.flavor }}/packages/*.deb
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-linux-${{ matrix.flavor }}
+          path: build/ui/linux-${{ matrix.flavor }}/*.png
           if-no-files-found: error
 
   release-linux:

@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import OpenRdp 1.0
 
 Pane {
     id: root
@@ -15,7 +16,10 @@ Pane {
             action[key] = patch[key];
         dispatchAction(action);
     }
-    padding: 24
+    padding: 32
+    background: Rectangle {
+        color: Design.background
+    }
     ScrollView {
         anchors.fill: parent
         contentWidth: availableWidth
@@ -25,10 +29,17 @@ Pane {
             spacing: 16
             Label {
                 text: qsTr("Settings")
-                font.pixelSize: 26
+                font.pixelSize: 30
                 font.bold: true
             }
             GroupBox {
+                padding: 20
+                background: Rectangle {
+                    y: 10
+                    color: Design.surface
+                    radius: 12
+                    border.color: Design.border
+                }
                 title: qsTr("Appearance")
                 Layout.fillWidth: true
                 RowLayout {
@@ -49,6 +60,13 @@ Pane {
                 }
             }
             GroupBox {
+                padding: 20
+                background: Rectangle {
+                    y: 10
+                    color: Design.surface
+                    radius: 12
+                    border.color: Design.border
+                }
                 title: qsTr("Defaults for new PCs")
                 Layout.fillWidth: true
                 ColumnLayout {
@@ -114,6 +132,13 @@ Pane {
                 }
             }
             GroupBox {
+                padding: 20
+                background: Rectangle {
+                    y: 10
+                    color: Design.surface
+                    radius: 12
+                    border.color: Design.border
+                }
                 title: qsTr("Session controls")
                 Layout.fillWidth: true
                 ColumnLayout {
@@ -148,6 +173,13 @@ Pane {
                 }
             }
             GroupBox {
+                padding: 20
+                background: Rectangle {
+                    y: 10
+                    color: Design.surface
+                    radius: 12
+                    border.color: Design.border
+                }
                 title: qsTr("Error reporting")
                 Layout.fillWidth: true
                 ColumnLayout {
@@ -169,6 +201,13 @@ Pane {
                 }
             }
             GroupBox {
+                padding: 20
+                background: Rectangle {
+                    y: 10
+                    color: Design.surface
+                    radius: 12
+                    border.color: Design.border
+                }
                 title: qsTr("About & updates")
                 Layout.fillWidth: true
                 ColumnLayout {

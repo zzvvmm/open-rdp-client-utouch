@@ -6,6 +6,10 @@ Item {
     id: root
 
     property string pcTitle: "Remote PC"
+    property bool blocked: false
+    property bool temporarySession: false
+    signal savePcRequested
+    signal retryRequested
     property string sessionStage: "disconnected"
     property string stageDetail: ""
     property string touchMode: "direct_touch"
@@ -26,49 +30,66 @@ Item {
     property bool precisionMode: false
 
     signal dispatchAction(var payload)
-    signal exitSessionView()
+    signal exitSessionView
 
     function notifyFrameUpdated() {
-        viewport.refreshCanvas()
+        viewport.refreshCanvas();
     }
 
     function restoreKeyboardFocus() {
-        Qt.callLater(function() {
-            oskInput.restoreFocus()
-        })
+        Qt.callLater(function () {
+                oskInput.restoreFocus();
+            });
     }
 
     function releasePointer() {
-        if (dragLocked) root.dispatchAction({ action: "mouse_button", button: 1, pressed: false })
-        dragLocked = false
-        if (viewport) viewport.cancelInput()
+        if (dragLocked)
+            root.dispatchAction({
+                    "action": "mouse_button",
+                    "button": 1,
+                    "pressed": false
+                });
+        dragLocked = false;
+        if (viewport)
+            viewport.cancelInput();
     }
 
     onVisibleChanged: {
         if (!visible) {
-            releasePointer()
-            oskInput.hideSoftwareKeyboard()
-        } else restoreKeyboardFocus()
+            releasePointer();
+            oskInput.hideSoftwareKeyboard();
+        } else
+            restoreKeyboardFocus();
+    }
+    onBlockedChanged: {
+        if (blocked)
+            releasePointer();
+        else
+            restoreKeyboardFocus();
     }
     onSessionStageChanged: {
-        if (sessionStage !== "connected") releasePointer()
+        if (sessionStage !== "connected")
+            releasePointer();
         else {
-            restoreKeyboardFocus()
-            resizeDebounce.restart()
+            restoreKeyboardFocus();
+            resizeDebounce.restart();
         }
     }
     onPendingCertChanged: {
-        if (pendingCert !== null) releasePointer()
-        else restoreKeyboardFocus()
+        if (pendingCert !== null)
+            releasePointer();
+        else
+            restoreKeyboardFocus();
     }
 
     Connections {
         target: Qt.application
         function onStateChanged() {
             if (Qt.application.state !== Qt.ApplicationActive) {
-                root.releasePointer()
-                oskInput.hideSoftwareKeyboard()
-            } else root.restoreKeyboardFocus()
+                root.releasePointer();
+                oskInput.hideSoftwareKeyboard();
+            } else
+                root.restoreKeyboardFocus();
         }
     }
 
@@ -78,26 +99,31 @@ Item {
         interval: 350
         repeat: false
         onTriggered: {
-            if (root.visible && root.sessionStage === "connected" && root.dynamicResolution
-                    && viewport.width >= 320 && viewport.height >= 240) {
+            if (root.visible && root.sessionStage === "connected" && root.dynamicResolution && viewport.width >= 320 && viewport.height >= 240) {
                 root.dispatchAction({
-                    action: "resize_session",
-                    width: Math.round(viewport.width),
-                    height: Math.round(viewport.height),
-                    scaleFactor: root.desktopScaleFactor
-                })
+                        "action": "resize_session",
+                        "width": Math.round(viewport.width),
+                        "height": Math.round(viewport.height),
+                        "scaleFactor": root.desktopScaleFactor
+                    });
             }
         }
     }
 
-    onWidthChanged: { releasePointer(); resizeDebounce.restart() }
-    onHeightChanged: { releasePointer(); resizeDebounce.restart() }
+    onWidthChanged: {
+        releasePointer();
+        resizeDebounce.restart();
+    }
+    onHeightChanged: {
+        releasePointer();
+        resizeDebounce.restart();
+    }
 
     // Hidden input to summon Lomiri OSK and capture hardware/OSK keyboard input
     RemoteKeyboard {
         id: oskInput
         objectName: "sessionKeyboard"
-        enabled: root.visible && root.sessionStage === "connected" && root.pendingCert === null
+        enabled: root.visible && root.sessionStage === "connected" && root.pendingCert === null && !root.blocked
         focus: enabled
         onDispatchAction: root.dispatchAction(payload)
     }
@@ -110,7 +136,7 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: pointerControls.top
-        enabled: root.visible && root.sessionStage === "connected" && root.pendingCert === null
+        enabled: root.visible && root.sessionStage === "connected" && root.pendingCert === null && !root.blocked
 
         touchMode: root.touchMode
         remoteWidth: root.remoteWidth
@@ -121,47 +147,49 @@ Item {
         dragLocked: root.dragLocked
 
         onRelativeMove: {
-            if (!oskInput.activeFocus) root.restoreKeyboardFocus()
+            if (!oskInput.activeFocus)
+                root.restoreKeyboardFocus();
             root.dispatchAction({
-                action: "trackpad_move",
-                dx: dx,
-                dy: dy
-            })
+                    "action": "trackpad_move",
+                    "dx": dx,
+                    "dy": dy
+                });
         }
         onAbsoluteMove: {
-            if (!oskInput.activeFocus) root.restoreKeyboardFocus()
+            if (!oskInput.activeFocus)
+                root.restoreKeyboardFocus();
             root.dispatchAction({
-                action: "pointer_move_abs",
-                x: rx,
-                y: ry
-            })
+                    "action": "pointer_move_abs",
+                    "x": rx,
+                    "y": ry
+                });
         }
         onMouseClick: {
-            root.restoreKeyboardFocus()
+            root.restoreKeyboardFocus();
             root.dispatchAction({
-                action: "mouse_click",
-                button: button,
-                doubleClick: doubleClick,
-                x: rx,
-                y: ry
-            })
+                    "action": "mouse_click",
+                    "button": button,
+                    "doubleClick": doubleClick,
+                    "x": rx,
+                    "y": ry
+                });
         }
         onMouseButton: {
-            root.restoreKeyboardFocus()
+            root.restoreKeyboardFocus();
             root.dispatchAction({
-                action: "mouse_button",
-                button: button,
-                pressed: pressed,
-                x: rx,
-                y: ry
-            })
+                    "action": "mouse_button",
+                    "button": button,
+                    "pressed": pressed,
+                    "x": rx,
+                    "y": ry
+                });
         }
         onMouseScroll: {
             root.dispatchAction({
-                action: "mouse_scroll",
-                vertical: verticalDelta,
-                horizontal: horizontalDelta
-            })
+                    "action": "mouse_scroll",
+                    "vertical": verticalDelta,
+                    "horizontal": horizontalDelta
+                });
         }
     }
 
@@ -177,42 +205,44 @@ Item {
         showStats: root.showStats
 
         onToggleTouchMode: {
-            root.releasePointer()
-            var nextMode = root.touchMode === "mouse_pointer" ? "direct_touch" : "mouse_pointer"
+            root.releasePointer();
+            var nextMode = root.touchMode === "mouse_pointer" ? "direct_touch" : "mouse_pointer";
             root.dispatchAction({
-                action: "set_touch_mode",
-                mode: nextMode
-            })
-            root.restoreKeyboardFocus()
+                    "action": "set_touch_mode",
+                    "mode": nextMode
+                });
+            root.restoreKeyboardFocus();
         }
         onToggleKeyboard: oskInput.toggleSoftwareKeyboard()
         onCycleZoom: {
             if (viewport.zoomFactor < 1.4) {
-                viewport.zoomFactor = 1.5
+                viewport.zoomFactor = 1.5;
             } else if (viewport.zoomFactor < 1.9) {
-                viewport.zoomFactor = 2.0
+                viewport.zoomFactor = 2.0;
             } else {
-                viewport.resetZoom()
+                viewport.resetZoom();
             }
-            root.restoreKeyboardFocus()
+            root.restoreKeyboardFocus();
         }
         onSendChordRequested: {
             root.dispatchAction({
-                action: "send_chord",
-                chord: chord
-            })
-            root.restoreKeyboardFocus()
+                    "action": "send_chord",
+                    "chord": chord
+                });
+            root.restoreKeyboardFocus();
         }
         onDisconnectRequested: {
-            root.releasePointer()
-            root.dispatchAction({ action: "disconnect_session" })
-            root.exitSessionView()
+            root.releasePointer();
+            root.dispatchAction({
+                    "action": "disconnect_session"
+                });
+            root.exitSessionView();
         }
     }
 
     PointerControls {
         id: pointerControls
-        visible: root.sessionStage === "connected" && root.pendingCert === null
+        visible: root.sessionStage === "connected" && root.pendingCert === null && !root.blocked
         height: visible ? units.gu(5.6) : 0
         anchors.left: parent.left
         anchors.right: parent.right
@@ -221,19 +251,27 @@ Item {
         precisionMode: root.precisionMode
 
         onClickRequested: {
-            root.releasePointer()
-            root.dispatchAction({ action: "mouse_click", button: button, doubleClick: doubleClick })
-            root.restoreKeyboardFocus()
+            root.releasePointer();
+            root.dispatchAction({
+                    "action": "mouse_click",
+                    "button": button,
+                    "doubleClick": doubleClick
+                });
+            root.restoreKeyboardFocus();
         }
         onToggleDragRequested: {
-            viewport.cancelInput()
-            root.dragLocked = !root.dragLocked
-            root.dispatchAction({ action: "mouse_button", button: 1, pressed: root.dragLocked })
-            root.restoreKeyboardFocus()
+            viewport.cancelInput();
+            root.dragLocked = !root.dragLocked;
+            root.dispatchAction({
+                    "action": "mouse_button",
+                    "button": 1,
+                    "pressed": root.dragLocked
+                });
+            root.restoreKeyboardFocus();
         }
         onTogglePrecisionRequested: {
-            root.precisionMode = !root.precisionMode
-            root.restoreKeyboardFocus()
+            root.precisionMode = !root.precisionMode;
+            root.restoreKeyboardFocus();
         }
     }
 
@@ -241,7 +279,7 @@ Item {
     VirtualKeyBar {
         id: vKeyBar
         objectName: "sessionVirtualKeyBar"
-        enabled: root.sessionStage === "connected" && root.pendingCert === null
+        enabled: root.sessionStage === "connected" && root.pendingCert === null && !root.blocked
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
@@ -253,31 +291,31 @@ Item {
 
         onModifierTapped: {
             root.dispatchAction({
-                action: "toggle_modifier",
-                modifier: modifierName
-            })
-            root.restoreKeyboardFocus()
+                    "action": "toggle_modifier",
+                    "modifier": modifierName
+                });
+            root.restoreKeyboardFocus();
         }
         onVirtualKeyTapped: {
             root.dispatchAction({
-                action: "send_virtual_key",
-                key: keyName
-            })
-            root.restoreKeyboardFocus()
+                    "action": "send_virtual_key",
+                    "key": keyName
+                });
+            root.restoreKeyboardFocus();
         }
         onChordTapped: {
             root.dispatchAction({
-                action: "send_chord",
-                chord: chordName
-            })
-            root.restoreKeyboardFocus()
+                    "action": "send_chord",
+                    "chord": chordName
+                });
+            root.restoreKeyboardFocus();
         }
         onSummonOskRequested: oskInput.toggleSoftwareKeyboard()
     }
 
     // Connection Progress / Handshake Overlay
     Rectangle {
-        visible: root.sessionStage !== "connected" && root.pendingCert === null
+        visible: root.sessionStage !== "connected" && root.pendingCert === null && !root.blocked
         anchors.fill: parent
         color: "#E60E131B"
         z: 70
@@ -313,27 +351,49 @@ Item {
             Button {
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: units.gu(20)
+                height: Math.max(48, units.gu(6))
+                visible: root.sessionStage === "error"
+                text: i18n.tr("Retry")
+                color: "#0078D4"
+                onClicked: root.retryRequested()
+            }
+            Button {
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: units.gu(20)
                 text: root.sessionStage === "error" ? i18n.tr("Back to PCs") : i18n.tr("Cancel")
                 color: "#3A1E24"
                 onClicked: {
-                    root.dispatchAction({ action: "disconnect_session" })
-                    root.exitSessionView()
+                    root.dispatchAction({
+                            "action": "disconnect_session"
+                        });
+                    root.exitSessionView();
                 }
             }
         }
+    }
+
+    Button {
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: 16
+        z: 75
+        visible: root.temporarySession && root.pendingCert === null
+        text: i18n.tr("Save PC")
+        height: Math.max(48, units.gu(6))
+        onClicked: root.savePcRequested()
     }
 
     // TOFU Certificate Inspection & Trust Dialog
     CertPromptDialog {
         certData: root.pendingCert
         onDecisionMade: {
-            root.pendingCert = null
+            root.pendingCert = null;
             root.dispatchAction({
-                action: "respond_certificate",
-                decision: decision
-            })
+                    "action": "respond_certificate",
+                    "decision": decision
+                });
             if (decision === "reject") {
-                root.exitSessionView()
+                root.exitSessionView();
             }
         }
     }
