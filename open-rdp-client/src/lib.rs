@@ -3,10 +3,10 @@ compile_error!("Choose exactly one platform: linux-desktop or ubuntu-touch");
 #[cfg(not(any(feature = "linux-desktop", feature = "ubuntu-touch")))]
 compile_error!("Choose a platform: linux-desktop or ubuntu-touch");
 
-pub mod platform;
 pub mod app_controller;
 pub mod error_reporting;
 pub mod models;
+pub mod platform;
 pub mod rdp;
 pub mod storage;
 
@@ -19,8 +19,12 @@ use std::sync::Arc;
 use app_controller::AppController;
 use storage::{CredentialVault, StorageDatabase};
 
-pub type RdpUiEventCallback =
-    extern "C" fn(json_ptr: *const c_char, bin_ptr: *const c_uchar, bin_len: usize, user_data: *mut c_void);
+pub type RdpUiEventCallback = extern "C" fn(
+    json_ptr: *const c_char,
+    bin_ptr: *const c_uchar,
+    bin_len: usize,
+    user_data: *mut c_void,
+);
 
 pub struct RdpAppHandle {
     controller: Arc<AppController>,
@@ -92,15 +96,7 @@ pub unsafe extern "C" fn rdp_app_dispatch(
     };
     match handle_ref.controller.dispatch_action(json_str) {
         Ok(()) => 0,
-        Err(err) => {
-            let err_json = serde_json::json!({
-                "type": "toast_error",
-                "message": err,
-            })
-            .to_string();
-            let _ = CString::new(err_json);
-            -3
-        }
+        Err(_) => -3,
     }
 }
 
@@ -161,12 +157,31 @@ pub unsafe extern "C" fn rdp_app_destroy(handle: *mut RdpAppHandle) {
 
 /// Qt forwards only an allowlisted category and a source location, never log text.
 #[no_mangle]
-pub unsafe extern "C" fn rdp_report_ui_error(code: *const c_char, file: *const c_char, line: u32, fatal: c_int) {
-    if code.is_null() { return; }
-    let Some(reporter) = error_reporting::current() else { return; };
-    let Ok(code) = CStr::from_ptr(code).to_str() else { return; };
-    let Some(code) = error_reporting::ErrorCode::from_ui(code) else { return; };
-    let source = if file.is_null() { "" } else { CStr::from_ptr(file).to_str().unwrap_or_default() };
+pub unsafe extern "C" fn rdp_report_ui_error(
+    code: *const c_char,
+    file: *const c_char,
+    line: u32,
+    fatal: c_int,
+) {
+    if code.is_null() {
+        return;
+    }
+    let Some(reporter) = error_reporting::current() else {
+        return;
+    };
+    let Ok(code) = CStr::from_ptr(code).to_str() else {
+        return;
+    };
+    let Some(code) = error_reporting::ErrorCode::from_ui(code) else {
+        return;
+    };
+    let source = if file.is_null() {
+        ""
+    } else {
+        CStr::from_ptr(file).to_str().unwrap_or_default()
+    };
     reporter.capture(code, source, line);
-    if fatal != 0 { reporter.flush(std::time::Duration::from_secs(2)); }
+    if fatal != 0 {
+        reporter.flush(std::time::Duration::from_secs(2));
+    }
 }

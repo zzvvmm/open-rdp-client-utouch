@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: rdp-client-ut.zzvvmm 0.3.0\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-24 18:00+0000\n"
+"POT-Creation-Date: 2026-11-09 16:03+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -15,139 +15,684 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-msgid "Open RDP Client"
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:123
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:123
+msgid "%1 PCs"
 msgstr ""
 
-msgid "Open RDP Client for Ubuntu Touch"
+#: ubuntu-touch/qml/pages/AccountsPage.qml:70
+msgid "+ Add Account"
 msgstr ""
 
-msgid "Appearance (Suru Theme)"
-msgstr ""
-
-msgid "Ubuntu Touch Remote Desktop"
-msgstr ""
-
-msgid "Connect"
-msgstr ""
-
-msgid "Resume"
-msgstr ""
-
-msgid "PCs"
-msgstr ""
-
+#: ubuntu-touch/qml/Main.qml:305
 msgid "Accounts & Certs"
 msgstr ""
 
-msgid "Settings"
+#: ubuntu-touch/qml/Main.qml:191 ubuntu-touch/qml/pages/DevicesPage.qml:194
+msgid "Add PC"
 msgstr ""
 
-msgid "Left"
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:141
+msgid "Add Remote PC"
 msgstr ""
 
-msgid "Right"
+#: ubuntu-touch/qml/components/ConnectionDialogs.qml:76
+msgid "Add this connection to your saved PCs."
 msgstr ""
 
-msgid "Double"
+#: ubuntu-touch/qml/pages/DevicesPage.qml:183
+msgid "Add your first PC"
 msgstr ""
 
-msgid "Drag"
+#: ubuntu-touch/qml/pages/DevicesPage.qml:348
+msgid "Address"
 msgstr ""
 
-msgid "Release"
+#: ubuntu-touch/qml/pages/DevicesPage.qml:95
+msgid "All"
 msgstr ""
 
-msgid "Precise"
+#: ubuntu-touch/qml/pages/DevicesPage.qml:372
+msgid "All groups"
 msgstr ""
 
-msgid "Keyboard"
-msgstr ""
-
-msgid "Copy"
-msgstr ""
-
-msgid "Paste"
-msgstr ""
-
-msgid "Select all"
-msgstr ""
-
-msgid "Super / Win"
-msgstr ""
-
-msgid "Update available"
-msgstr ""
-
-msgid "Open RDP Client "
-msgstr ""
-
-msgid "Installed version: "
-msgstr ""
-
-msgid "Changelog"
-msgstr ""
-
-msgid "No changelog was provided for this version."
-msgstr ""
-
-msgid "OpenStore will open so you can download and install the update."
-msgstr ""
-
-msgid "Could not open OpenStore. Please try again or choose Update Later."
-msgstr ""
-
-msgid "Update Now"
-msgstr ""
-
-msgid "Update Later"
-msgstr ""
-
-msgid "Skip This Version"
-msgstr ""
-
-msgid "Checking for updates…"
-msgstr ""
-
-msgid "You are up to date."
-msgstr ""
-
+#: ubuntu-touch/qml/pages/SettingsPage.qml:35
 msgid "An update is available. Check again to view it."
 msgstr ""
 
-msgid "Could not check for updates. Check your connection and try again."
+#: ubuntu-touch/qml/pages/SettingsPage.qml:118
+msgid "Appearance (Suru Theme)"
 msgstr ""
 
-msgid "Update information is unavailable for this device. Please try again later."
+#: ubuntu-touch/qml/components/ConnectionDialogs.qml:98 ubuntu-touch/qml/pages/PcEditorDialog.qml:279
+msgid "Ask every time"
 msgstr ""
 
-msgid "Continue updating in OpenStore."
-msgstr ""
-
-msgid "Could not open OpenStore. Please try again."
-msgstr ""
-
-msgid "Updates"
-msgstr ""
-
+#: ubuntu-touch/qml/pages/SettingsPage.qml:235
 msgid "Automatically check for updates"
 msgstr ""
 
-msgid "Check once a day when the app is opened or resumed. Manual checks are always available."
+#: ubuntu-touch/qml/pages/SessionPage.qml:363
+msgid "Back to PCs"
 msgstr ""
 
-msgid "Checking…"
+#: ubuntu-touch/qml/Main.qml:471 ubuntu-touch/qml/components/CertPromptDialog.qml:135 ubuntu-touch/qml/components/ConnectionDialogs.qml:160 ubuntu-touch/qml/pages/AccountsPage.qml:169 ubuntu-touch/qml/pages/DevicesPage.qml:263 ubuntu-touch/qml/pages/SessionPage.qml:363
+msgid "Cancel"
 msgstr ""
 
+#: ubuntu-touch/qml/components/CertPromptDialog.qml:49
+msgid "Certificate Fingerprint Changed!"
+msgstr ""
+
+#: ubuntu-touch/qml/components/UpdatePrompt.qml:84
+msgid "Changelog"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:251
 msgid "Check for updates"
 msgstr ""
 
-msgid "Skipped version: "
+#: ubuntu-touch/qml/pages/SettingsPage.qml:243
+msgid "Check once a day when the app is opened or resumed. Manual checks are always available."
 msgstr ""
 
-#: qml/pages/SettingsPage.qml
+#: ubuntu-touch/qml/pages/SettingsPage.qml:33
+msgid "Checking for updates…"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:251
+msgid "Checking…"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:228
+msgid "Clear thumbnail"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:148
+msgid "Close"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:251
+msgid "Confirm delete PC"
+msgstr ""
+
+#: ubuntu-touch/qml/Main.qml:478 ubuntu-touch/qml/components/ConnectionDialogs.qml:174 ubuntu-touch/qml/components/PcCard.qml:156 ubuntu-touch/qml/pages/DevicesPage.qml:148 ubuntu-touch/qml/pages/DevicesPage.qml:228
+msgid "Connect"
+msgstr ""
+
+#: ubuntu-touch/qml/components/ConnectionDialogs.qml:76
+msgid "Connect once. Save the PC later if you need it again."
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:154
+msgid "Connected"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:154
+msgid "Connecting"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SessionPage.qml:346
+msgid "Connecting to remote PC…"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:38
+msgid "Continue updating in OpenStore."
+msgstr ""
+
+#: ubuntu-touch/qml/components/SessionHudPill.qml:288
+msgid "Copy"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:36
+msgid "Could not check for updates. Check your connection and try again."
+msgstr ""
+
+#: ubuntu-touch/qml/components/UpdatePrompt.qml:117
+msgid "Could not open OpenStore. Please try again or choose Update Later."
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:39
+msgid "Could not open OpenStore. Please try again."
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:65
+msgid "Could not save PC."
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:28
+msgid "Could not save account."
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:366
+msgid "Default Touch Input Mode"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:251
+msgid "Delete"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:251
+msgid "Delete PC…"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:189
+msgid "Devices"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:376
+msgid "Direct Touch"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:186
+msgid "Display"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:301
+msgid "Display Resolution"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:306
+msgid "Done"
+msgstr ""
+
+#: ubuntu-touch/qml/components/PointerControls.qml:26
+msgid "Double"
+msgstr ""
+
+#: ubuntu-touch/qml/components/PointerControls.qml:27
+msgid "Drag"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:228
+msgid "Duplicate"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:234 ubuntu-touch/qml/pages/DevicesPage.qml:228
+msgid "Edit"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:141
+msgid "Edit Remote PC"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:102
+msgid "Edit User Account"
+msgstr ""
+
+#: ubuntu-touch/qml/components/SessionHudPill.qml:270
+msgid "End"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:152
+msgid "Enter a username."
+msgstr ""
+
+#: ubuntu-touch/qml/Main.qml:443
+msgid "Enter your Windows or xrdp credentials (NLA / CredSSP)"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:98
+msgid "Favorites"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:113
+msgid "Filters, sorting, and groups"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:127
+msgid "Fluent Dark"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:137
+msgid "Friendly Label (optional, e.g. Work Domain Admin)"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:233
+msgid "Friendly Name (Optional)"
+msgstr ""
+
+#: ubuntu-touch/qml/components/ConnectionDialogs.qml:117
+msgid "Friendly name"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:183
+msgid "General"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:53
+msgid "Global Preferences"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:320
+msgid "Grid"
+msgstr ""
+
+#: ubuntu-touch/qml/components/ConnectionDialogs.qml:126 ubuntu-touch/qml/pages/PcEditorDialog.qml:247 ubuntu-touch/qml/pages/DevicesPage.qml:365
+msgid "Group"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:400
+msgid "Group name"
+msgstr ""
+
+#: ubuntu-touch/qml/components/ConnectionDialogs.qml:87
+msgid "Hostname or IP address, optionally :port"
+msgstr ""
+
+#: ubuntu-touch/qml/components/UpdatePrompt.qml:77 ubuntu-touch/qml/pages/SettingsPage.qml:218
+msgid "Installed version: "
+msgstr ""
+
+#: ubuntu-touch/qml/components/CertPromptDialog.qml:94
+msgid "Issuer: "
+msgstr ""
+
+#: ubuntu-touch/qml/components/SessionHudPill.qml:181
+msgid "Keyboard"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:152 ubuntu-touch/qml/pages/DevicesPage.qml:351
+msgid "Last connected"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:311
+msgid "Layout"
+msgstr ""
+
+#: ubuntu-touch/qml/components/PointerControls.qml:24
+msgid "Left"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:299
+msgid "Library options"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:323
+msgid "List"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:393
+msgid "Manage selected group"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:382
+msgid "Mouse Pointer (Trackpad)"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:345
+msgid "Name"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:443
+msgid "Network Level Authentication (CredSSP / NLA)"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:151
+msgid "Never connected"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:102
+msgid "New User Account"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:347
+msgid "No certificates pinned yet. You will be prompted to inspect and trust certificates on first connection."
+msgstr ""
+
+#: ubuntu-touch/qml/components/UpdatePrompt.qml:100
+msgid "No changelog was provided for this version."
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:183
+msgid "No matching PCs"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:261
+msgid "No saved accounts yet. Add one above to sign in automatically when connecting."
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:153
+msgid "Offline demo"
+msgstr ""
+
+#: ubuntu-touch/qml/Main.qml:155
+msgid "Open RDP Client"
+msgstr ""
+
+#: ubuntu-touch/qml/components/UpdatePrompt.qml:68
+msgid "Open RDP Client "
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:294
+msgid "Open RDP Client for Ubuntu Touch"
+msgstr ""
+
+#: ubuntu-touch/qml/components/UpdatePrompt.qml:109
+msgid "OpenStore will open so you can download and install the update."
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:215
+msgid "PC Name (Hostname or IP[:Port]) *"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:150
+msgid "PC actions"
+msgstr ""
+
+#: ubuntu-touch/qml/Main.qml:301
+msgid "PCs"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:190
+msgid "PCs appear here after a successful connection."
+msgstr ""
+
+#: ubuntu-touch/qml/Main.qml:461
+msgid "Password"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:129
+msgid "Password (leave blank to keep existing)"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:129
+msgid "Password (optional)"
+msgstr ""
+
+#: ubuntu-touch/qml/components/SessionHudPill.qml:289
+msgid "Paste"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:283
+msgid "Pinned SHA-256 TLS fingerprints for remote RDP servers."
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:38
+msgid "Please enter a hostname or IP address."
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:307
+msgid "Powered by a pure-Rust IronRDP engine with QtQuick/Lomiri UI. Supports CredSSP/NLA authentication, TOFU certificate verification, dynamic display resize (DISP), clipboard sync (CLIPRDR), and PCM audio redirection (RDPSND)."
+msgstr ""
+
+#: ubuntu-touch/qml/components/PointerControls.qml:28
+msgid "Precise"
+msgstr ""
+
+#: ubuntu-touch/qml/components/ConnectionDialogs.qml:60 ubuntu-touch/qml/pages/DevicesPage.qml:66 ubuntu-touch/qml/pages/DevicesPage.qml:84
+msgid "Quick Connect"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:101
+msgid "Recent"
+msgstr ""
+
+#: ubuntu-touch/qml/components/PointerControls.qml:27
+msgid "Release"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:341
+msgid "Remote Desktop Scale"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:422
+msgid "Remove group"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:416
+msgid "Removing a group moves its PCs to Saved PCs."
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:403
+msgid "Rename group"
+msgstr ""
+
+#: ubuntu-touch/qml/components/ConnectionDialogs.qml:174
+msgid "Replace session"
+msgstr ""
+
+#: ubuntu-touch/qml/components/ConnectionDialogs.qml:60
+msgid "Replace the active session?"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:84
 msgid "Report Errors"
 msgstr ""
 
-#: qml/pages/SettingsPage.qml
+#: ubuntu-touch/qml/components/PcCard.qml:156
+msgid "Resume"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SessionPage.qml:356
+msgid "Retry"
+msgstr ""
+
+#: ubuntu-touch/qml/Main.qml:182
+msgid "Return to session"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:61
+msgid "Reusable Windows credentials stored in the encrypted local vault."
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:337
+msgid "Revoke"
+msgstr ""
+
+#: ubuntu-touch/qml/components/PointerControls.qml:25
+msgid "Right"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:459
+msgid "Save"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:467
+msgid "Save & Connect"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:144
+msgid "Save Account"
+msgstr ""
+
+#: ubuntu-touch/qml/components/ConnectionDialogs.qml:174 ubuntu-touch/qml/pages/SessionPage.qml:381
+msgid "Save PC"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:190
+msgid "Save a Windows or Linux PC, or use Quick Connect."
+msgstr ""
+
+#: ubuntu-touch/qml/components/ConnectionDialogs.qml:60
+msgid "Save this PC"
+msgstr ""
+
+msgid "Saved User Accounts"
+msgstr ""
+
+#: ubuntu-touch/qml/components/ConnectionDialogs.qml:91
+msgid "Saved account"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:53
+msgid "Saved accounts"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:467
+msgid "Saving…"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:78
+msgid "Search names, addresses, or groups"
+msgstr ""
+
+#: ubuntu-touch/qml/components/SessionHudPill.qml:290
+msgid "Select all"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:94
 msgid "Send technical error reports to Sentry to help fix bugs. Enabled by default; changes apply immediately. Reports exclude credentials, PC addresses, screen contents, and clipboard text."
+msgstr ""
+
+#: ubuntu-touch/qml/Main.qml:309
+msgid "Settings"
+msgstr ""
+
+#: ubuntu-touch/qml/components/SessionHudPill.qml:239
+msgid "Shortcuts"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:188
+msgid "Show live resolution & FPS badge in session pill"
+msgstr ""
+
+#: ubuntu-touch/qml/Main.qml:434
+msgid "Sign in to "
+msgstr ""
+
+#: ubuntu-touch/qml/components/UpdatePrompt.qml:139
+msgid "Skip This Version"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:267
+msgid "Skipped version: "
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:336
+msgid "Sort by"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:390
+msgid "Sound Output (RDPSND)"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:190
+msgid "Star a PC to keep it within easy reach."
+msgstr ""
+
+#: ubuntu-touch/qml/components/CertPromptDialog.qml:87
+msgid "Subject: "
+msgstr ""
+
+#: ubuntu-touch/qml/components/SessionHudPill.qml:299
+msgid "Super / Win"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:132
+msgid "Suru Light"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:428
+msgid "Sync Clipboard (CLIPRDR)"
+msgstr ""
+
+#: ubuntu-touch/qml/components/ConnectionDialogs.qml:76
+msgid "The current session will disconnect when the new connection starts."
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:149
+msgid "Toggle favorite"
+msgstr ""
+
+#: ubuntu-touch/qml/components/SessionHudPill.qml:152
+msgid "Touch"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:156
+msgid "Touch & Virtual Trackpad"
+msgstr ""
+
+#: ubuntu-touch/qml/components/SessionHudPill.qml:152
+msgid "Trackpad"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:163
+msgid "Trackpad Pointer Speed: "
+msgstr ""
+
+#: ubuntu-touch/qml/components/CertPromptDialog.qml:149
+msgid "Trust Always"
+msgstr ""
+
+#: ubuntu-touch/qml/components/CertPromptDialog.qml:142
+msgid "Trust Once"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:277
+msgid "Trusted PC Certificates (TOFU)"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:190
+msgid "Try another search or clear your filters."
+msgstr ""
+
+#: ubuntu-touch/qml/Main.qml:163
+msgid "Ubuntu Touch Remote Desktop"
+msgstr ""
+
+#: ubuntu-touch/qml/components/UpdatePrompt.qml:132
+msgid "Update Later"
+msgstr ""
+
+#: ubuntu-touch/qml/components/UpdatePrompt.qml:125
+msgid "Update Now"
+msgstr ""
+
+#: ubuntu-touch/qml/components/UpdatePrompt.qml:60
+msgid "Update available"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:37
+msgid "Update information is unavailable for this device. Please try again later."
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:211
+msgid "Updates"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/PcEditorDialog.qml:269
+msgid "User Account"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:120
+msgid "Username (e.g. DOMAIN\\alice or alice@corp.local)"
+msgstr ""
+
+#: ubuntu-touch/qml/Main.qml:453
+msgid "Username (e.g. DOMAIN\\user or user)"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/AccountsPage.qml:328
+msgid "Valid until: "
+msgstr ""
+
+#: ubuntu-touch/qml/components/CertPromptDialog.qml:101
+msgid "Valid: "
+msgstr ""
+
+#: ubuntu-touch/qml/components/CertPromptDialog.qml:50
+msgid "Verify Remote PC Certificate"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:300
+msgid "Version 0.3.0 • License: GPL-3.0-or-later"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/SettingsPage.qml:34
+msgid "You are up to date."
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:56
+msgid "Your PCs"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:183
+msgid "Your favorites belong here"
+msgstr ""
+
+#: ubuntu-touch/qml/pages/DevicesPage.qml:183
+msgid "Your recent connections"
 msgstr ""

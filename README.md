@@ -4,6 +4,10 @@ Open RDP Client is a GPL-3.0-or-later remote desktop client powered by the pure-
 
 Both frontends support saved PCs, search and favorites, reusable accounts, NLA/CredSSP authentication, certificate inspection and trust-on-first-use, screenshots, clipboard text synchronization, PCM audio, resolution presets, dynamic display resize, and an interactive offline demo. Each application supports one active session.
 
+The [PC library guide](docs/PC_LIBRARY.md) covers Favorites and Recent, groups,
+grid/list layouts, temporary Quick Connect, Save & Connect, and connection retry.
+Both frontends support these workflows with light and dark themes.
+
 ## Repository structure
 
 ```text
@@ -13,8 +17,8 @@ root/
 ├── open-rdp-client/
 │   ├── src/               # IronRDP, controller, storage, models, C FFI
 │   ├── qt/                # Shared Qt bridge, canvas, Qt 5/6 audio
-│   ├── qml/OpenRdp/       # Shared state, viewport, pointer and keyboard logic
-│   ├── assets/            # Logo, icons, existing screenshots
+│   ├── qml/OpenRdp/       # Shared design, library, state, viewport and input
+│   ├── assets/            # Logo, icons, native screenshots
 │   └── tests/
 ├── linux/                 # Qt 6 frontend, native input, tests, DEB packaging
 ├── ubuntu-touch/          # Qt 5/Lomiri frontend, translations, Click packaging
@@ -86,6 +90,10 @@ Desktop storage uses `$XDG_CONFIG_HOME/open-rdp-client`, `$XDG_DATA_HOME/open-rd
 ## CI and releases
 
 Pull requests and `main` pushes build/test Ubuntu Touch and both Linux distributions. Pushing a stable `vX.Y.Z` tag publishes the tested Ubuntu 24.04 and Debian 13 `.deb` packages to GitHub Releases after all checks pass. The tag must match the application version and have release notes in `docs/releases/X.Y.Z.md`.
+
+CI also attaches `ui-linux-ubuntu24`, `ui-linux-debian13`, and `ui-ubuntu-touch`
+screenshot artifacts covering themes, layouts, and desktop/mobile sizes. These
+captures use isolated sample PCs and the offline demo.
 
 Desktop release filenames include the distribution to keep both downloads distinct. Releases include checksums and the source SHA. Publication uses the built-in `GITHUB_TOKEN`; Ubuntu Touch/OpenStore uploads follow the [release guide](docs/RELEASING.md).
 

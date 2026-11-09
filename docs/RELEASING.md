@@ -84,7 +84,11 @@ gh pr create --base main --fill
 Wait for CI and merge the PR using the repository's normal review process.
 The current [CI workflow](../.github/workflows/ci.yml) runs Rust tests, builds
 amd64 and arm64 packages, and runs QML tests on amd64. It also builds and tests
-both Linux distributions. PRs and pushes to `main` produce CI artifacts. Pushing
+both Linux distributions. The amd64 Ubuntu Touch test command also launches the
+installed native frontend with isolated demo data. Review the `ui-ubuntu-touch`,
+`ui-linux-ubuntu24`, and `ui-linux-debian13` screenshot artifacts for visual changes.
+Use the [PC library guide](PC_LIBRARY.md) for the new profile/session workflows.
+PRs and pushes to `main` produce CI artifacts. Pushing
 a stable `vX.Y.Z` tag runs all checks and then publishes the tested Linux `.deb`
 files to a GitHub Release. Ubuntu Touch `.click` and OpenStore publication
 continue through the manual steps below.

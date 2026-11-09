@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="/">
+    <file alias="qml/components/ConnectionDialogs.qml">qml/components/ConnectionDialogs.qml</file>
     <file alias="qml/Main.qml">qml/Main.qml</file>
     <file alias="qml/theme/Theme.qml">qml/theme/Theme.qml</file>
     <file alias="qml/pages/DevicesPage.qml">qml/pages/DevicesPage.qml</file>

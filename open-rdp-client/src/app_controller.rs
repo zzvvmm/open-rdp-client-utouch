@@ -1,7 +1,11 @@
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc, Mutex,
+};
 
 use serde_json::{json, Value};
 
+use crate::error_reporting::{backend_error, ErrorReporter};
 use crate::models::account::{current_epoch_secs, split_domain_username};
 use crate::models::{
     parse_host_port, AudioRedirectionMode, CertStore, CertTrustDecision, PcProfile, ResolutionMode,
@@ -13,7 +17,6 @@ use crate::rdp::session_worker::{
     spawn_rdp_session, RdpCommand, RdpSessionConfig, RdpSessionHandle, RdpWorkerEvent, SessionStage,
 };
 use crate::storage::{AppSettings, CredentialVault, StorageDatabase};
-use crate::error_reporting::{ErrorReporter, backend_error};
 
 pub type UiEventCallback = Arc<dyn Fn(&str, &[u8]) + Send + Sync + 'static>;
 
@@ -29,6 +32,11 @@ pub struct AppController {
     input_mapper: Mutex<InputMapper>,
     active_session: Mutex<Option<Arc<RdpSessionHandle>>>,
     active_profile_id: Mutex<String>,
+    active_profile: Mutex<Option<PcProfile>>,
+    temporary_profile: Mutex<Option<PcProfile>>,
+    attempt_id: AtomicU64,
+    attempt_events: Mutex<()>,
+    session_detail: Mutex<String>,
     active_touch_mode: Mutex<TouchInputMode>,
     session_stage: Mutex<SessionStage>,
     ui_callback: UiEventCallback,
@@ -69,6 +77,11 @@ impl AppController {
             input_mapper: Mutex::new(InputMapper::new(1280, 720)),
             active_session: Mutex::new(None),
             active_profile_id: Mutex::new(String::new()),
+            active_profile: Mutex::new(None),
+            temporary_profile: Mutex::new(None),
+            attempt_id: AtomicU64::new(0),
+            attempt_events: Mutex::new(()),
+            session_detail: Mutex::new(String::new()),
             active_touch_mode: Mutex::new(initial_touch),
             session_stage: Mutex::new(SessionStage::Disconnected),
             ui_callback,
@@ -111,40 +124,25 @@ impl AppController {
 
         let profiles_json: Vec<Value> = profiles
             .iter()
-            .map(|p| {
-                let account_label = match &p.account_id {
-                    Some(acc_id) => accounts
-                        .iter()
-                        .find(|a| &a.id == acc_id)
-                        .map(|a| a.display_name.clone())
-                        .unwrap_or_else(|| "Ask every time".to_string()),
-                    None => "Ask every time".to_string(),
-                };
-                json!({
-                    "id": p.id,
-                    "hostname": p.hostname,
-                    "port": p.port,
-                    "address": p.address_string(),
-                    "friendlyName": p.friendly_name,
-                    "displayTitle": p.display_title(),
-                    "accountId": p.account_id.clone().unwrap_or_default(),
-                    "accountLabel": account_label,
-                    "resolutionPreset": p.resolution_mode.preset_key(),
-                    "resolutionLabel": p.resolution_mode.display_label(),
-                    "scaleFactor": p.scale_factor,
-                    "clipboardRedirection": p.clipboard_redirection,
-                    "audioMode": p.audio_mode.as_key(),
-                    "defaultTouchMode": p.default_touch_mode.as_key(),
-                    "enableNla": p.enable_nla,
-                    "enableTls": p.enable_tls,
-                    "groupName": p.group_name,
-                    "lastConnectedEpoch": p.last_connected_epoch.unwrap_or(0),
-                    "thumbnailPath": p.thumbnail_path.clone().unwrap_or_default(),
-                    "favorite": p.favorite,
-                    "isDemo": p.hostname.eq_ignore_ascii_case("demo.local") || p.hostname.eq_ignore_ascii_case("demo"),
-                })
-            })
+            .map(|p| profile_snapshot(p, &accounts))
             .collect();
+        let target = self.active_profile.lock().ok().and_then(|p| p.clone());
+        let active_profile = target.as_ref().map(|target| {
+            profile_snapshot(
+                profiles
+                    .iter()
+                    .find(|p| p.id == target.id)
+                    .unwrap_or(target),
+                &accounts,
+            )
+        });
+        let temporary = self.temporary_profile.lock().ok().and_then(|p| p.clone());
+        let is_temporary = temporary.as_ref().is_some_and(|p| p.id == active_id);
+        let detail = self
+            .session_detail
+            .lock()
+            .map(|s| s.clone())
+            .unwrap_or_default();
 
         let accounts_json: Vec<Value> = accounts
             .iter()
@@ -192,6 +190,8 @@ impl AppController {
             "knownCerts": certs_json,
             "settings": {
                 "themeMode": settings.theme_mode,
+                "libraryLayout": settings.library_layout,
+                "librarySort": settings.library_sort,
                 "defaultResolution": settings.default_resolution.preset_key(),
                 "defaultScaleFactor": settings.default_scale_factor,
                 "defaultTouchMode": settings.default_touch_mode.as_key(),
@@ -207,6 +207,9 @@ impl AppController {
             },
             "session": {
                 "activeProfileId": active_id,
+                "activeProfile": active_profile,
+                "isTemporary": is_temporary,
+                "stageDetail": detail,
                 "stage": stage.as_str(),
                 "stageLabel": stage.human_label(),
                 "touchMode": touch_mode.as_key(),
@@ -223,19 +226,50 @@ impl AppController {
     }
 
     pub fn dispatch_action(self: &Arc<Self>, action_json: &str) -> Result<(), String> {
-        let v: Value =
-            serde_json::from_str(action_json).map_err(|e| format!("Invalid action JSON: {e}"))?;
-        let action = v
-            .get("action")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
+        let parsed = serde_json::from_str::<Value>(action_json)
+            .map_err(|e| format!("Invalid action JSON: {e}"));
+        let result = parsed
+            .as_ref()
+            .map_err(Clone::clone)
+            .and_then(|v| self.dispatch_value(v));
+        let request_id = parsed
+            .as_ref()
+            .ok()
+            .and_then(|v| v.get("requestId"))
+            .and_then(Value::as_str);
+        if let Some(request_id) = request_id {
+            self.emit_json(&json!({
+                "type": "action_result", "requestId": request_id,
+                "action": parsed.as_ref().unwrap()["action"], "ok": result.is_ok(),
+                "message": result.as_ref().err().cloned().unwrap_or_default(),
+                "entityId": result.as_ref().ok().and_then(|id| id.clone()),
+            }));
+        } else if let Err(error) = &result {
+            self.emit_json(&json!({ "type": "toast_error", "message": error }));
+        }
+        result.map(|_| ())
+    }
 
+    fn dispatch_value(self: &Arc<Self>, v: &Value) -> Result<Option<String>, String> {
+        let action = v.get("action").and_then(Value::as_str).unwrap_or_default();
+        let mut entity_id = None;
         match action {
             "init" | "refresh" => {
                 self.emit_state_snapshot();
             }
             "save_pc" => {
-                self.handle_save_pc(&v)?;
+                entity_id = Some(self.handle_save_pc(v)?);
+                self.emit_state_snapshot();
+            }
+            "quick_connect" => {
+                self.handle_quick_connect(v)?;
+            }
+            "save_temporary_pc" => {
+                entity_id = Some(self.handle_save_temporary(v)?);
+                self.emit_state_snapshot();
+            }
+            "rename_group" | "remove_group" => {
+                self.handle_group(v, action == "remove_group")?;
                 self.emit_state_snapshot();
             }
             "delete_pc" => {
@@ -312,7 +346,9 @@ impl AppController {
             }
             "set_touch_mode" => {
                 let mode = TouchInputMode::from_key(
-                    v.get("mode").and_then(Value::as_str).unwrap_or("direct_touch"),
+                    v.get("mode")
+                        .and_then(Value::as_str)
+                        .unwrap_or("direct_touch"),
                 );
                 if let Ok(mut guard) = self.active_touch_mode.lock() {
                     *guard = mode;
@@ -414,7 +450,10 @@ impl AppController {
                 self.send_fastpath_events(events.into_iter().collect());
             }
             "toggle_modifier" => {
-                let modifier = v.get("modifier").and_then(Value::as_str).unwrap_or_default();
+                let modifier = v
+                    .get("modifier")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default();
                 if let Ok(mut mapper) = self.input_mapper.lock() {
                     mapper.toggle_sticky_modifier(modifier);
                 }
@@ -476,10 +515,10 @@ impl AppController {
             }
             _ => {}
         }
-        Ok(())
+        Ok(entity_id)
     }
 
-    fn handle_save_pc(&self, v: &Value) -> Result<(), String> {
+    fn handle_save_pc(&self, v: &Value) -> Result<String, String> {
         let host_input = v
             .get("hostInput")
             .and_then(Value::as_str)
@@ -502,10 +541,7 @@ impl AppController {
                 .and_then(Value::as_str)
                 .unwrap_or("native"),
         );
-        let scale_factor = v
-            .get("scaleFactor")
-            .and_then(Value::as_u64)
-            .unwrap_or(100) as u32;
+        let scale_factor = v.get("scaleFactor").and_then(Value::as_u64).unwrap_or(100) as u32;
         let clipboard_redirection = v
             .get("clipboardRedirection")
             .and_then(Value::as_bool)
@@ -536,8 +572,11 @@ impl AppController {
             .map(str::trim)
             .filter(|s| !s.is_empty());
 
-        let mut profiles = self.profiles.lock().map_err(|e| e.to_string())?;
+        let mut guard = self.profiles.lock().map_err(|e| e.to_string())?;
+        let mut profiles = guard.clone();
+        let saved_id;
         if let Some(id) = existing_id {
+            saved_id = id.to_string();
             if let Some(pc) = profiles.iter_mut().find(|p| p.id == id) {
                 pc.hostname = hostname;
                 pc.port = port;
@@ -551,6 +590,8 @@ impl AppController {
                 pc.enable_nla = enable_nla;
                 pc.enable_tls = enable_tls;
                 pc.group_name = group_name;
+            } else {
+                return Err("PC profile not found".into());
             }
         } else {
             // Reuse the original input: reconstructing an unbracketed IPv6 address
@@ -565,9 +606,94 @@ impl AppController {
             pc.enable_nla = enable_nla;
             pc.enable_tls = enable_tls;
             pc.group_name = group_name;
+            saved_id = pc.id.clone();
             profiles.push(pc);
         }
-        self.db.save_profiles(&profiles)
+        self.db.save_profiles(&profiles)?;
+        *guard = profiles;
+        Ok(saved_id)
+    }
+
+    fn handle_group(&self, v: &Value, remove: bool) -> Result<(), String> {
+        let name = v
+            .get("groupName")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim();
+        let new_name = if remove {
+            "Saved PCs"
+        } else {
+            v.get("newName")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .trim()
+        };
+        if name.is_empty() || new_name.is_empty() {
+            return Err("Enter a group name".into());
+        }
+        let mut guard = self.profiles.lock().map_err(|e| e.to_string())?;
+        let mut profiles = guard.clone();
+        if !profiles.iter().any(|p| p.group_name == name) {
+            return Err("Group not found".into());
+        }
+        for pc in profiles.iter_mut().filter(|p| p.group_name == name) {
+            pc.group_name = new_name.into();
+        }
+        self.db.save_profiles(&profiles)?;
+        *guard = profiles;
+        Ok(())
+    }
+
+    fn handle_quick_connect(self: &Arc<Self>, v: &Value) -> Result<(), String> {
+        let mut pc = PcProfile::new(
+            v.get("hostInput")
+                .and_then(Value::as_str)
+                .unwrap_or_default(),
+            "",
+        )?;
+        let settings = self.settings.lock().map_err(|e| e.to_string())?.clone();
+        pc.resolution_mode = settings.default_resolution;
+        pc.scale_factor = settings.default_scale_factor;
+        pc.default_touch_mode = settings.default_touch_mode;
+        pc.audio_mode = settings.default_audio_mode;
+        pc.clipboard_redirection = settings.default_clipboard_enabled;
+        pc.account_id = v
+            .get("accountId")
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty())
+            .map(String::from);
+        let id = pc.id.clone();
+        *self.temporary_profile.lock().map_err(|e| e.to_string())? = Some(pc);
+        let mut connect = v.clone();
+        connect["id"] = json!(id);
+        self.handle_connect_pc(&connect)
+    }
+
+    fn handle_save_temporary(&self, v: &Value) -> Result<String, String> {
+        let pc = self
+            .temporary_profile
+            .lock()
+            .map_err(|e| e.to_string())?
+            .clone()
+            .ok_or("No temporary connection to save")?;
+        let mut saved = pc.clone();
+        if let Some(name) = v.get("friendlyName").and_then(Value::as_str) {
+            saved.friendly_name = name.trim().into();
+        }
+        if let Some(group) = v
+            .get("groupName")
+            .and_then(Value::as_str)
+            .filter(|s| !s.trim().is_empty())
+        {
+            saved.group_name = group.trim().into();
+        }
+        let mut guard = self.profiles.lock().map_err(|e| e.to_string())?;
+        let mut profiles = guard.clone();
+        profiles.push(saved);
+        self.db.save_profiles(&profiles)?;
+        *guard = profiles;
+        *self.temporary_profile.lock().map_err(|e| e.to_string())? = None;
+        Ok(pc.id)
     }
 
     fn handle_delete_pc(&self, id: &str) -> Result<(), String> {
@@ -686,6 +812,18 @@ impl AppController {
 
     fn handle_save_settings(&self, v: &Value) -> Result<(), String> {
         let mut settings = self.settings.lock().map_err(|e| e.to_string())?;
+        if let Some(layout) = v.get("libraryLayout").and_then(Value::as_str) {
+            if !["grid", "list"].contains(&layout) {
+                return Err("Unknown library layout".into());
+            }
+            settings.library_layout = layout.into();
+        }
+        if let Some(sort) = v.get("librarySort").and_then(Value::as_str) {
+            if !["name", "address", "recent"].contains(&sort) {
+                return Err("Unknown library sort".into());
+            }
+            settings.library_sort = sort.into();
+        }
         if let Some(theme) = v.get("themeMode").and_then(Value::as_str) {
             settings.theme_mode = theme.to_string();
         }
@@ -727,10 +865,7 @@ impl AppController {
         }
         // Honor opt-out before disk I/O, including when persisting settings fails.
         self.error_reporter.set_enabled(settings.report_errors);
-        self.db.save_settings(&settings).map_err(|error| {
-            self.emit_json(&json!({ "type": "toast_error", "message": error }));
-            error
-        })
+        self.db.save_settings(&settings)
     }
 
     fn handle_connect_pc(self: &Arc<Self>, v: &Value) -> Result<(), String> {
@@ -771,6 +906,13 @@ impl AppController {
                 .iter()
                 .find(|p| p.id == profile_id)
                 .cloned()
+                .or_else(|| {
+                    self.temporary_profile
+                        .lock()
+                        .ok()
+                        .and_then(|p| p.clone())
+                        .filter(|p| p.id == profile_id)
+                })
                 .ok_or_else(|| "PC profile not found".to_string())?
         };
 
@@ -827,8 +969,11 @@ impl AppController {
             ("ubuntu".to_string(), "demo".to_string(), String::new())
         };
 
-        // Disconnect any previous session first
+        // Invalidate callbacks before cancelling a previous connection, including retries to the same PC.
         self.handle_disconnect_session();
+        let attempt = self.attempt_id.fetch_add(1, Ordering::SeqCst) + 1;
+        *self.active_profile.lock().map_err(|e| e.to_string())? = Some(profile.clone());
+        *self.session_detail.lock().map_err(|e| e.to_string())? = String::new();
 
         let (width, height) = profile
             .resolution_mode
@@ -845,14 +990,6 @@ impl AppController {
         }
         if let Ok(mut st) = self.session_stage.lock() {
             *st = SessionStage::Resolving;
-        }
-
-        // Update last_connected_epoch
-        if let Ok(mut profiles) = self.profiles.lock() {
-            if let Some(pc) = profiles.iter_mut().find(|p| p.id == profile.id) {
-                pc.last_connected_epoch = Some(current_epoch_secs());
-            }
-            let _ = self.db.save_profiles(&profiles);
         }
 
         self.emit_state_snapshot();
@@ -882,7 +1019,7 @@ impl AppController {
             Arc::clone(&self.cert_store),
             Arc::new(move |worker_event| {
                 if let Some(ctrl) = controller_weak.upgrade() {
-                    ctrl.on_worker_event(worker_event);
+                    ctrl.on_attempt_event(attempt, worker_event);
                 }
             }),
         );
@@ -895,13 +1032,28 @@ impl AppController {
     }
 
     fn handle_disconnect_session(&self) {
+        let _events = self
+            .attempt_events
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        self.attempt_id.fetch_add(1, Ordering::SeqCst);
         let active_id = self
             .active_profile_id
             .lock()
             .map(|s| s.clone())
             .unwrap_or_default();
 
-        if !active_id.is_empty() {
+        let saved_connected = self
+            .profiles
+            .lock()
+            .map(|ps| ps.iter().any(|p| p.id == active_id))
+            .unwrap_or(false)
+            && self
+                .session_stage
+                .lock()
+                .map(|s| matches!(*s, SessionStage::Connected))
+                .unwrap_or(false);
+        if saved_connected {
             let thumb_path = self.db.thumbnail_path_for(&active_id);
             let saved_ok = self
                 .framebuffer
@@ -932,7 +1084,23 @@ impl AppController {
         if let Ok(mut st) = self.session_stage.lock() {
             *st = SessionStage::Disconnected;
         }
+        if let Ok(mut target) = self.active_profile.lock() {
+            *target = None;
+        }
+        if let Ok(mut detail) = self.session_detail.lock() {
+            detail.clear();
+        }
         self.emit_state_snapshot();
+    }
+
+    fn on_attempt_event(&self, attempt: u64, event: RdpWorkerEvent) {
+        let _events = self
+            .attempt_events
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if self.attempt_id.load(Ordering::SeqCst) == attempt {
+            self.on_worker_event(event);
+        }
     }
 
     fn on_worker_event(&self, event: RdpWorkerEvent) {
@@ -944,6 +1112,24 @@ impl AppController {
             } => {
                 if let Ok(mut st) = self.session_stage.lock() {
                     *st = stage.clone();
+                }
+                if let Ok(mut value) = self.session_detail.lock() {
+                    *value = detail.clone();
+                }
+                if matches!(stage, SessionStage::Connected) {
+                    let now = current_epoch_secs();
+                    if let Ok(mut profiles) = self.profiles.lock() {
+                        if let Some(pc) = profiles.iter_mut().find(|p| p.id == profile_id) {
+                            pc.last_connected_epoch = Some(now);
+                            let _ = self.db.save_profiles(&profiles);
+                        }
+                    }
+                    if let Ok(mut temporary) = self.temporary_profile.lock() {
+                        if let Some(pc) = temporary.as_mut().filter(|p| p.id == profile_id) {
+                            pc.last_connected_epoch = Some(now);
+                        }
+                    }
+                    self.emit_state_snapshot();
                 }
                 self.emit_json(&json!({
                     "type": "session_stage",
@@ -1026,6 +1212,9 @@ impl AppController {
                         SessionStage::Disconnected
                     };
                 }
+                if let Ok(mut value) = self.session_detail.lock() {
+                    *value = reason.clone();
+                }
                 self.emit_json(&json!({
                     "type": "session_ended",
                     "profileId": profile_id,
@@ -1037,10 +1226,7 @@ impl AppController {
         }
     }
 
-    fn send_fastpath_events(
-        &self,
-        events: Vec<ironrdp_pdu::input::fast_path::FastPathInputEvent>,
-    ) {
+    fn send_fastpath_events(&self, events: Vec<ironrdp_pdu::input::fast_path::FastPathInputEvent>) {
         if events.is_empty() {
             return;
         }
@@ -1056,10 +1242,264 @@ impl AppController {
     }
 }
 
+fn profile_snapshot(p: &PcProfile, accounts: &[UserAccount]) -> Value {
+    let account_label = match &p.account_id {
+        Some(acc_id) => accounts
+            .iter()
+            .find(|a| &a.id == acc_id)
+            .map(|a| a.display_name.clone())
+            .unwrap_or_else(|| "Ask every time".to_string()),
+        None => "Ask every time".to_string(),
+    };
+    json!({
+        "id": p.id,
+        "hostname": p.hostname,
+        "port": p.port,
+        "address": p.address_string(),
+        "friendlyName": p.friendly_name,
+        "displayTitle": p.display_title(),
+        "accountId": p.account_id.clone().unwrap_or_default(),
+        "accountLabel": account_label,
+        "resolutionPreset": p.resolution_mode.preset_key(),
+        "resolutionLabel": p.resolution_mode.display_label(),
+        "scaleFactor": p.scale_factor,
+        "clipboardRedirection": p.clipboard_redirection,
+        "audioMode": p.audio_mode.as_key(),
+        "defaultTouchMode": p.default_touch_mode.as_key(),
+        "enableNla": p.enable_nla,
+        "enableTls": p.enable_tls,
+        "groupName": p.group_name,
+        "lastConnectedEpoch": p.last_connected_epoch.unwrap_or(0),
+        "thumbnailPath": p.thumbnail_path.clone().unwrap_or_default(),
+        "favorite": p.favorite,
+        "isDemo": p.hostname.eq_ignore_ascii_case("demo.local") || p.hostname.eq_ignore_ascii_case("demo"),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    fn workflow_fixture() -> (
+        tempfile::TempDir,
+        Arc<AppController>,
+        StorageDatabase,
+        Arc<Mutex<Vec<Value>>>,
+    ) {
+        let dir = tempdir().unwrap();
+        let db =
+            StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
+        db.save_settings(&AppSettings {
+            report_errors: false,
+            ..AppSettings::default()
+        })
+        .unwrap();
+        let vault = CredentialVault::open_at(dir.path().join("vault")).unwrap();
+        let events = Arc::new(Mutex::new(Vec::new()));
+        let captured = events.clone();
+        let ctrl = AppController::new(
+            db.clone(),
+            vault,
+            Arc::new(move |value, _| {
+                captured
+                    .lock()
+                    .unwrap()
+                    .push(serde_json::from_str(value).unwrap());
+            }),
+        );
+        (dir, ctrl, db, events)
+    }
+
+    #[test]
+    fn quick_connect_prompts_without_persisting_profiles_passwords_or_thumbnails() {
+        let (_dir, ctrl, db, events) = workflow_fixture();
+        let saved = db.load_profiles();
+        ctrl.dispatch_action(r#"{"action":"quick_connect","hostInput":"[fd00::1234]:3390"}"#)
+            .unwrap();
+        let temp = ctrl.temporary_profile.lock().unwrap().clone().unwrap();
+        assert_eq!(temp.hostname, "fd00::1234");
+        assert_eq!(temp.port, 3390);
+        assert!(temp.last_connected_epoch.is_none());
+        assert_eq!(db.load_profiles(), saved);
+        assert!(db.load_accounts().is_empty());
+        assert!(events
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|e| e["type"] == "credentials_required" && e["profileId"] == temp.id));
+        *ctrl.active_profile_id.lock().unwrap() = temp.id.clone();
+        *ctrl.active_profile.lock().unwrap() = Some(temp.clone());
+        ctrl.on_worker_event(RdpWorkerEvent::StageChanged {
+            profile_id: temp.id.clone(),
+            stage: SessionStage::Connected,
+            detail: "Connected".into(),
+        });
+        ctrl.emit_state_snapshot();
+        let snapshot = events.lock().unwrap().last().unwrap().clone();
+        assert_eq!(snapshot["session"]["isTemporary"], true);
+        assert_eq!(
+            snapshot["session"]["activeProfile"]["address"],
+            "[fd00::1234]:3390"
+        );
+        ctrl.handle_disconnect_session();
+        assert!(!db.thumbnail_path_for(&temp.id).exists());
+        assert_eq!(db.load_profiles(), saved);
+        assert!(ctrl
+            .vault
+            .get_password(&temp.id)
+            .unwrap_or_default()
+            .is_empty());
+    }
+
+    #[test]
+    fn saving_a_temporary_connection_keeps_identity_and_last_success() {
+        let (_dir, ctrl, db, events) = workflow_fixture();
+        ctrl.dispatch_action(r#"{"action":"quick_connect","hostInput":"work-pc:3391"}"#)
+            .unwrap();
+        let id = ctrl
+            .temporary_profile
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .id
+            .clone();
+        ctrl.on_worker_event(RdpWorkerEvent::StageChanged {
+            profile_id: id.clone(),
+            stage: SessionStage::Connected,
+            detail: "Connected".into(),
+        });
+        ctrl.dispatch_action(r#"{"action":"save_temporary_pc","friendlyName":"Work","groupName":"Office","requestId":"save-1"}"#).unwrap();
+        let saved = db.load_profiles().into_iter().find(|p| p.id == id).unwrap();
+        assert_eq!(saved.friendly_name, "Work");
+        assert_eq!(saved.group_name, "Office");
+        assert!(saved.last_connected_epoch.is_some());
+        assert!(ctrl.temporary_profile.lock().unwrap().is_none());
+        let last = events.lock().unwrap().last().unwrap().clone();
+        assert_eq!(last["type"], "action_result");
+        assert_eq!(last["entityId"], id);
+        assert_eq!(last["ok"], true);
+        assert!(ctrl
+            .dispatch_action(r#"{"action":"save_temporary_pc"}"#)
+            .is_err());
+    }
+
+    #[test]
+    fn group_operations_and_library_preferences_survive_restart() {
+        let (_dir, ctrl, db, _) = workflow_fixture();
+        for host in ["one", "two"] {
+            ctrl.dispatch_action(
+                &json!({"action":"save_pc","hostInput":host,"groupName":"Office"}).to_string(),
+            )
+            .unwrap();
+        }
+        ctrl.dispatch_action(r#"{"action":"rename_group","groupName":"Office","newName":"Work"}"#)
+            .unwrap();
+        assert_eq!(
+            db.load_profiles()
+                .iter()
+                .filter(|p| p.group_name == "Work")
+                .count(),
+            2
+        );
+        ctrl.dispatch_action(r#"{"action":"remove_group","groupName":"Work"}"#)
+            .unwrap();
+        assert_eq!(db.load_profiles().len(), 3);
+        assert_eq!(
+            db.load_profiles()
+                .iter()
+                .filter(|p| p.group_name == "Saved PCs")
+                .count(),
+            2
+        );
+        ctrl.dispatch_action(
+            r#"{"action":"save_settings","libraryLayout":"list","librarySort":"recent"}"#,
+        )
+        .unwrap();
+        let settings = db.load_settings();
+        assert_eq!(settings.library_layout, "list");
+        assert_eq!(settings.library_sort, "recent");
+        assert!(ctrl
+            .dispatch_action(r#"{"action":"save_settings","libraryLayout":"unknown"}"#)
+            .is_err());
+    }
+
+    #[test]
+    fn save_errors_are_correlated_and_do_not_replace_saved_data() {
+        let (dir, ctrl, db, events) = workflow_fixture();
+        let profiles = db.load_profiles();
+        ctrl.dispatch_action(r#"{"action":"save_pc","hostInput":"","requestId":"bad-host"}"#)
+            .unwrap_err();
+        let result = events.lock().unwrap().last().unwrap().clone();
+        assert_eq!(result["requestId"], "bad-host");
+        assert_eq!(result["ok"], false);
+        assert!(!result["message"].as_str().unwrap().is_empty());
+        std::fs::remove_dir_all(dir.path().join("config")).unwrap();
+        std::fs::write(dir.path().join("config"), "blocked").unwrap();
+        ctrl.dispatch_action(
+            r#"{"action":"save_pc","hostInput":"new-host","requestId":"disk-failure"}"#,
+        )
+        .unwrap_err();
+        assert_eq!(*ctrl.profiles.lock().unwrap(), profiles);
+        ctrl.dispatch_action(r#"{"action":"save_pc","hostInput":""}"#)
+            .unwrap_err();
+        assert_eq!(
+            events.lock().unwrap().last().unwrap()["type"],
+            "toast_error"
+        );
+    }
+
+    #[test]
+    fn recents_require_success_and_cancelled_attempts_cannot_change_session_state() {
+        let (_dir, ctrl, db, _) = workflow_fixture();
+        let id = db.load_profiles()[0].id.clone();
+        ctrl.attempt_id.store(10, Ordering::SeqCst);
+        ctrl.on_attempt_event(
+            10,
+            RdpWorkerEvent::StageChanged {
+                profile_id: id.clone(),
+                stage: SessionStage::Error,
+                detail: "Failure".into(),
+            },
+        );
+        assert!(db.load_profiles()[0].last_connected_epoch.is_none());
+        ctrl.on_attempt_event(
+            9,
+            RdpWorkerEvent::StageChanged {
+                profile_id: id.clone(),
+                stage: SessionStage::Connected,
+                detail: "Stale".into(),
+            },
+        );
+        assert!(matches!(
+            *ctrl.session_stage.lock().unwrap(),
+            SessionStage::Error
+        ));
+        assert!(db.load_profiles()[0].last_connected_epoch.is_none());
+        ctrl.on_attempt_event(
+            10,
+            RdpWorkerEvent::StageChanged {
+                profile_id: id.clone(),
+                stage: SessionStage::Connected,
+                detail: "Connected".into(),
+            },
+        );
+        assert!(db.load_profiles()[0].last_connected_epoch.is_some());
+        ctrl.handle_disconnect_session();
+        ctrl.on_attempt_event(
+            10,
+            RdpWorkerEvent::SessionEnded {
+                profile_id: id,
+                reason: "Late failure".into(),
+                is_error: true,
+            },
+        );
+        assert!(matches!(
+            *ctrl.session_stage.lock().unwrap(),
+            SessionStage::Disconnected
+        ));
+    }
 
     #[test]
     fn opting_out_disables_reports_even_when_settings_storage_fails() {
@@ -1069,14 +1509,34 @@ mod tests {
         let vault = CredentialVault::open_at(dir.path().join("vault")).unwrap();
         let events = Arc::new(Mutex::new(Vec::<Value>::new()));
         let captured = Arc::clone(&events);
-        let ctrl = AppController::new(db, vault, Arc::new(move |json, _| {
-            captured.lock().unwrap().push(serde_json::from_str(json).unwrap());
-        }));
+        let ctrl = AppController::new(
+            db,
+            vault,
+            Arc::new(move |json, _| {
+                captured
+                    .lock()
+                    .unwrap()
+                    .push(serde_json::from_str(json).unwrap());
+            }),
+        );
         std::fs::remove_dir_all(&config).unwrap();
         std::fs::write(&config, "block settings storage").unwrap();
-        assert!(ctrl.dispatch_action(r#"{"action":"save_settings","reportErrors":false}"#).is_err());
-        assert!(ctrl.error_reporter.capture(crate::error_reporting::ErrorCode::RdpDecode, file!(), line!()).is_nil());
-        assert!(events.lock().unwrap().iter().any(|event| event["type"] == "toast_error"));
+        assert!(ctrl
+            .dispatch_action(r#"{"action":"save_settings","reportErrors":false}"#)
+            .is_err());
+        assert!(ctrl
+            .error_reporter
+            .capture(
+                crate::error_reporting::ErrorCode::RdpDecode,
+                file!(),
+                line!()
+            )
+            .is_nil());
+        assert!(events
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|event| event["type"] == "toast_error"));
     }
 
     #[test]
@@ -1129,11 +1589,8 @@ mod tests {
     #[test]
     fn update_preferences_are_exposed_and_other_setting_patches_preserve_them() {
         let dir = tempdir().unwrap();
-        let db = StorageDatabase::open_at(
-            dir.path().join("config"),
-            dir.path().join("cache"),
-        )
-        .unwrap();
+        let db =
+            StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
         let vault = CredentialVault::open_at(dir.path().join("vault")).unwrap();
         let events = Arc::new(Mutex::new(Vec::<Value>::new()));
         let captured = Arc::clone(&events);
@@ -1141,21 +1598,29 @@ mod tests {
             db.clone(),
             vault,
             Arc::new(move |json, _| {
-                captured.lock().unwrap().push(serde_json::from_str(json).unwrap());
+                captured
+                    .lock()
+                    .unwrap()
+                    .push(serde_json::from_str(json).unwrap());
             }),
         );
         ctrl.dispatch_action(r#"{"action":"init"}"#).unwrap();
         let first = events.lock().unwrap()[0].clone();
         assert_eq!(first["appVersion"], env!("CARGO_PKG_VERSION"));
-        assert_eq!(first["appFramework"], crate::storage::database::APP_FRAMEWORK);
+        assert_eq!(
+            first["appFramework"],
+            crate::storage::database::APP_FRAMEWORK
+        );
         assert_eq!(first["appPlatform"], crate::platform::PLATFORM);
         assert_eq!(first["updateProvider"], crate::platform::UPDATE_PROVIDER);
         assert!(first["appArchitecture"].as_str().is_some());
         assert_eq!(first["settings"]["autoCheckUpdates"], true);
         assert_eq!(first["settings"]["reportErrors"], true);
-        ctrl.dispatch_action(r#"{"action":"save_settings","reportErrors":false}"#).unwrap();
+        ctrl.dispatch_action(r#"{"action":"save_settings","reportErrors":false}"#)
+            .unwrap();
         ctrl.dispatch_action(r#"{"action":"save_settings","autoCheckUpdates":false,"skippedUpdateVersion":"0.1.4","lastUpdateCheckEpoch":1800000000}"#).unwrap();
-        ctrl.dispatch_action(r#"{"action":"save_settings","themeMode":"light"}"#).unwrap();
+        ctrl.dispatch_action(r#"{"action":"save_settings","themeMode":"light"}"#)
+            .unwrap();
         let stored = db.load_settings();
         assert!(!stored.auto_check_updates);
         assert!(!stored.report_errors);
@@ -1171,11 +1636,8 @@ mod tests {
     #[test]
     fn test_controller_pc_and_account_lifecycle() {
         let dir = tempdir().unwrap();
-        let db = StorageDatabase::open_at(
-            dir.path().join("config"),
-            dir.path().join("cache"),
-        )
-        .unwrap();
+        let db =
+            StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
         let vault = CredentialVault::open_at(dir.path().join("vault")).unwrap();
         let events = Arc::new(Mutex::new(Vec::<String>::new()));
         let events_clone = Arc::clone(&events);
@@ -1208,11 +1670,8 @@ mod tests {
     #[test]
     fn test_demo_session_full_tofu_and_thumbnail_lifecycle() {
         let dir = tempdir().unwrap();
-        let db = StorageDatabase::open_at(
-            dir.path().join("config"),
-            dir.path().join("cache"),
-        )
-        .unwrap();
+        let db =
+            StorageDatabase::open_at(dir.path().join("config"), dir.path().join("cache")).unwrap();
         let vault = CredentialVault::open_at(dir.path().join("vault")).unwrap();
         let events = Arc::new(Mutex::new(Vec::<Value>::new()));
         let events_clone = Arc::clone(&events);

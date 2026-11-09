@@ -1,5 +1,8 @@
 <RCC>
   <qresource prefix="/">
+    <file alias="assets/icons/pcs.svg">assets/icons/pcs.svg</file>
+    <file alias="assets/icons/accounts.svg">assets/icons/accounts.svg</file>
+    <file alias="assets/icons/settings.svg">assets/icons/settings.svg</file>
     <file alias="assets/logo.svg">assets/logo.svg</file>
     <file alias="assets/icons/keyboard.svg">assets/icons/keyboard.svg</file>
     <file alias="assets/icons/certificate.svg">assets/icons/certificate.svg</file>
@@ -7,6 +10,10 @@
     <file alias="assets/icons/trackpad.svg">assets/icons/trackpad.svg</file>
     <file alias="assets/icons/direct-touch.svg">assets/icons/direct-touch.svg</file>
     <file alias="OpenRdp/qmldir">qml/OpenRdp/qmldir</file>
+    <file alias="OpenRdp/Design.qml">qml/OpenRdp/Design.qml</file>
+    <file alias="OpenRdp/ActionButton.qml">qml/OpenRdp/ActionButton.qml</file>
+    <file alias="OpenRdp/PcLibrary.qml">qml/OpenRdp/PcLibrary.qml</file>
+    <file alias="OpenRdp/PcTile.qml">qml/OpenRdp/PcTile.qml</file>
     <file alias="OpenRdp/RdpViewport.qml">qml/OpenRdp/RdpViewport.qml</file>
     <file alias="OpenRdp/AppState.qml">qml/OpenRdp/AppState.qml</file>
     <file alias="OpenRdp/RemoteKeyboard.qml">qml/OpenRdp/RemoteKeyboard.qml</file>

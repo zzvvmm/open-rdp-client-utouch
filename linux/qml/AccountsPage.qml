@@ -1,6 +1,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import OpenRdp 1.0
 
 Pane {
     id: root
@@ -8,6 +9,7 @@ Pane {
     property var knownCerts: []
     readonly property bool editorVisible: editor.visible
     property string editId: ""
+    property bool busy: false
     property string validationError: ""
     signal dispatchAction(var payload)
     function editAccount(account) {
@@ -17,6 +19,7 @@ Pane {
         displayName.text = account.displayName || "";
         password.clear();
         validationError = "";
+        busy = false;
         editor.open();
         username.forceActiveFocus();
     }
@@ -25,6 +28,9 @@ Pane {
             validationError = qsTr("Enter a username.");
             return false;
         }
+        if (busy)
+            return false;
+        busy = true;
         dispatchAction({
                 "action": "save_account",
                 "id": editId,
@@ -33,11 +39,20 @@ Pane {
                 "displayName": displayName.text.trim(),
                 "password": password.text
             });
-        editor.close();
         password.clear();
         return true;
     }
-    padding: 24
+    function completeSave(result) {
+        busy = false;
+        if (result.ok)
+            editor.close();
+        else
+            validationError = result.message || qsTr("Could not save account.");
+    }
+    padding: 32
+    background: Rectangle {
+        color: Design.background
+    }
     ScrollView {
         anchors.fill: parent
         contentWidth: availableWidth
@@ -48,7 +63,7 @@ Pane {
             RowLayout {
                 Label {
                     text: qsTr("Saved accounts")
-                    font.pixelSize: 26
+                    font.pixelSize: 30
                     font.bold: true
                     Layout.fillWidth: true
                 }
@@ -59,24 +74,37 @@ Pane {
                 }
             }
             Label {
-                text: qsTr("Reusable credentials stored in the local vault.")
+                text: qsTr("Credentials for your remote PCs, stored in the encrypted local vault.")
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
                 opacity: 0.65
             }
             Repeater {
                 model: root.accounts
                 Frame {
+                    background: Rectangle {
+                        color: Design.surface
+                        radius: 12
+                        border.color: Design.border
+                    }
+                    padding: 16
                     required property var modelData
                     Layout.fillWidth: true
                     RowLayout {
                         anchors.fill: parent
                         ColumnLayout {
                             Layout.fillWidth: true
+                            Layout.minimumWidth: 0
                             Label {
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
                                 text: modelData.displayName
                                 textFormat: Text.PlainText
                                 font.bold: true
                             }
                             Label {
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
                                 text: modelData.qualifiedUsername + (modelData.hasSavedPassword ? qsTr(" · Password saved") : qsTr(" · Ask for password"))
                                 textFormat: Text.PlainText
                             }
@@ -112,13 +140,22 @@ Pane {
             Repeater {
                 model: root.knownCerts
                 Frame {
+                    background: Rectangle {
+                        color: Design.surface
+                        radius: 12
+                        border.color: Design.border
+                    }
+                    padding: 16
                     required property var modelData
                     Layout.fillWidth: true
                     RowLayout {
                         anchors.fill: parent
                         ColumnLayout {
                             Layout.fillWidth: true
+                            Layout.minimumWidth: 0
                             Label {
+                                Layout.fillWidth: true
+                                elide: Text.ElideRight
                                 text: modelData.hostPort + " (" + modelData.subjectCn + ")"
                                 textFormat: Text.PlainText
                                 font.bold: true
@@ -157,37 +194,53 @@ Pane {
         anchors.centerIn: parent
         width: Math.min(480, root.width - 40)
         modal: true
+        closePolicy: root.busy ? Popup.NoAutoClose : Popup.CloseOnEscape
         title: root.editId ? qsTr("Edit account") : qsTr("New account")
         onClosed: password.clear()
         footer: DialogButtonBox {
-            standardButtons: Dialog.Save | Dialog.Cancel
-            onAccepted: root.saveAccount()
-            onRejected: editor.reject()
+            ActionButton {
+                text: qsTr("Cancel")
+                enabled: !root.busy
+                onClicked: editor.reject()
+            }
+            ActionButton {
+                text: qsTr("Save account")
+                primary: true
+                enabled: !root.busy
+                onClicked: root.saveAccount()
+            }
         }
         contentItem: ColumnLayout {
             Label {
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                textFormat: Text.PlainText
                 text: root.validationError
                 visible: text.length > 0
                 color: "#e85c5c"
             }
             TextField {
                 id: username
+                implicitHeight: 48
                 objectName: "accountUsername"
                 Layout.fillWidth: true
                 placeholderText: qsTr("Username or DOMAIN\\user")
             }
             TextField {
                 id: domain
+                implicitHeight: 48
                 Layout.fillWidth: true
                 placeholderText: qsTr("Domain (optional)")
             }
             TextField {
                 id: displayName
+                implicitHeight: 48
                 Layout.fillWidth: true
                 placeholderText: qsTr("Display name (optional)")
             }
             TextField {
                 id: password
+                implicitHeight: 48
                 objectName: "accountPassword"
                 Layout.fillWidth: true
                 echoMode: TextInput.Password

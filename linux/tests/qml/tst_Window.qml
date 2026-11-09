@@ -8,51 +8,105 @@ TestCase {
     id: tests
     name: "DesktopWindow"
     when: windowShown
+    SignalSpy {
+        id: actions
+        target: RdpBridge
+        signalName: "actionDispatched"
+    }
     property var app
-    Component { id: factory; Desktop.Main { visible: false } }
-    function initTestCase() { app = factory.createObject(null); verify(app !== null) }
-    function cleanupTestCase() { app.destroy() }
+    Component {
+        id: factory
+        Desktop.Main {
+            visible: false
+        }
+    }
+    function initTestCase() {
+        app = factory.createObject(null);
+        verify(app !== null);
+    }
+    function cleanupTestCase() {
+        app.destroy();
+    }
     function cleanup() {
-        app.appState.showCredPrompt = false
-        app.appState.pendingCertPrompt = null
-        app.appState.inSessionView = false
-        app.visible = false
+        app.appState.showCredPrompt = false;
+        app.appState.pendingCertPrompt = null;
+        app.appState.inSessionView = false;
+        app.appState.activeProfileId = "";
+        app.appState.sessionStage = "disconnected";
+        app.appState.cancelReplacement();
+        app.visible = false;
+    }
+    function test_save_and_connect_uses_the_backend_returned_id() {
+        app.visible = true;
+        app.editor.openForNew({});
+        findChild(app.editor, "pcHostField").text = "new-host";
+        actions.clear();
+        app.editor.save(true);
+        verify(app.editor.visible);
+        var save = actions.signalArguments[0][0];
+        compare(save.action, "save_pc");
+        RdpBridge.deliverEvent({
+                "type": "action_result",
+                "requestId": save.requestId,
+                "action": "save_pc",
+                "ok": true,
+                "entityId": "new-profile"
+            });
+        verify(!app.editor.visible);
+        compare(actions.signalArguments[actions.count - 1][0].action, "connect_pc");
+        compare(actions.signalArguments[actions.count - 1][0].id, "new-profile");
     }
     function test_repeated_certificate_prompts_close_and_reopen() {
-        app.visible = true
+        app.visible = true;
         for (var i = 0; i < 2; ++i) {
-            RdpBridge.deliverEvent({type:"certificate_prompt", host:"example.test", port:3389,
-                subjectCn:"PC", issuerCn:"CA", sha256Fingerprint:"AB:CD", isMismatchWarning:i > 0})
-            var dialog = findChild(app,"certificateDialog")
-            verify(dialog.visible)
-            dialog.decision("trust_once")
-            tryCompare(dialog,"visible",false)
-            compare(app.appState.pendingCertPrompt,null)
+            RdpBridge.deliverEvent({
+                    "type": "certificate_prompt",
+                    "host": "example.test",
+                    "port": 3389,
+                    "subjectCn": "PC",
+                    "issuerCn": "CA",
+                    "sha256Fingerprint": "AB:CD",
+                    "isMismatchWarning": i > 0
+                });
+            var dialog = findChild(app, "certificateDialog");
+            verify(dialog.visible);
+            dialog.decision("trust_once");
+            tryCompare(dialog, "visible", false);
+            compare(app.appState.pendingCertPrompt, null);
         }
     }
     function test_credentials_cancel_clears_password_and_reopens() {
-        app.visible = true
+        app.visible = true;
         for (var i = 0; i < 2; ++i) {
-            RdpBridge.deliverEvent({type:"credentials_required", profileId:"pc", displayTitle:"Work", prefillUsername:"alice"})
-            var dialog = findChild(app,"credentialsDialog")
-            verify(dialog.visible)
-            var password = findChild(app,"credentialPassword")
-            password.text = "temporary"
-            dialog.reject()
-            tryCompare(dialog,"visible",false)
-            compare(password.text,"")
-            compare(app.appState.showCredPrompt,false)
+            RdpBridge.deliverEvent({
+                    "type": "credentials_required",
+                    "profileId": "pc",
+                    "displayTitle": "Work",
+                    "prefillUsername": "alice"
+                });
+            var dialog = findChild(app, "credentialsDialog");
+            verify(dialog.visible);
+            var password = findChild(app, "credentialPassword");
+            password.text = "temporary";
+            dialog.reject();
+            tryCompare(dialog, "visible", false);
+            compare(password.text, "");
+            compare(app.appState.showCredPrompt, false);
         }
     }
     function test_fullscreen_returns_to_window_and_theme_changes() {
-        app.visible = true
-        app.toggleFullscreen()
-        tryCompare(app,"visibility",Window.FullScreen)
-        app.toggleFullscreen()
-        tryCompare(app,"visibility",Window.Windowed)
-        app.appState.appSettings = {themeMode:"light"}
-        compare(app.palette.text,"#1b2028")
-        app.appState.appSettings = {themeMode:"dark"}
-        compare(app.palette.text,"#f3f6fa")
+        app.visible = true;
+        app.toggleFullscreen();
+        tryCompare(app, "visibility", Window.FullScreen);
+        app.toggleFullscreen();
+        tryCompare(app, "visibility", Window.Windowed);
+        app.appState.appSettings = {
+            "themeMode": "light"
+        };
+        compare(app.palette.text, "#1b2028");
+        app.appState.appSettings = {
+            "themeMode": "dark"
+        };
+        compare(app.palette.text, "#f3f6fa");
     }
 }

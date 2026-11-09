@@ -1,5 +1,6 @@
 import QtQuick 2.12
 import Lomiri.Components 1.3
+import OpenRdp 1.0 as Shared
 
 Flickable {
     id: root
@@ -13,8 +14,19 @@ Flickable {
     property string editUsername: ""
     property string editDomain: ""
     property string editDisplayName: ""
+    property bool saveBusy: false
+    property string validationError: ""
     property string editPassword: ""
 
+    onShowAccountEditorChanged: if (!showAccountEditor)
+        editPassword = ""
+    function completeSave(result) {
+        saveBusy = false;
+        if (result.ok)
+            showAccountEditor = false;
+        else
+            validationError = result.message || i18n.tr("Could not save account.");
+    }
     signal saveAccount(var payload)
     signal deleteAccount(string accountId)
     signal removeKnownCert(string hostPort)
@@ -38,7 +50,9 @@ Flickable {
                 width: parent.width - units.gu(18)
                 spacing: units.gu(0.3)
                 Label {
-                    text: i18n.tr("Saved User Accounts")
+                    text: i18n.tr("Saved accounts")
+                    width: parent.width
+                    elide: Text.ElideRight
                     fontSize: "large"
                     font.bold: true
                     color: root.darkMode ? "#F3F6FA" : "#1B2028"
@@ -56,12 +70,14 @@ Flickable {
                 text: i18n.tr("+ Add Account")
                 color: "#0078D4"
                 onClicked: {
-                    root.editAccountId = ""
-                    root.editUsername = ""
-                    root.editDomain = ""
-                    root.editDisplayName = ""
-                    root.editPassword = ""
-                    root.showAccountEditor = true
+                    root.editAccountId = "";
+                    root.editUsername = "";
+                    root.editDomain = "";
+                    root.editDisplayName = "";
+                    root.editPassword = "";
+                    root.validationError = "";
+                    root.saveBusy = false;
+                    root.showAccountEditor = true;
                 }
             }
         }
@@ -89,7 +105,16 @@ Flickable {
                     color: root.darkMode ? "#F3F6FA" : "#1B2028"
                 }
 
+                Label {
+                    text: root.validationError
+                    visible: text.length > 0
+                    color: Shared.Design.danger
+                    width: parent.width
+                    wrapMode: Text.Wrap
+                    textFormat: Text.PlainText
+                }
                 TextField {
+                    height: 48
                     width: parent.width
                     text: root.editUsername
                     placeholderText: i18n.tr("Username (e.g. DOMAIN\\alice or alice@corp.local)")
@@ -97,16 +122,16 @@ Flickable {
                 }
 
                 TextField {
+                    height: 48
                     width: parent.width
                     text: root.editPassword
                     echoMode: TextInput.Password
-                    placeholderText: root.editAccountId.length > 0
-                                     ? i18n.tr("Password (leave blank to keep existing)")
-                                     : i18n.tr("Password (optional)")
+                    placeholderText: root.editAccountId.length > 0 ? i18n.tr("Password (leave blank to keep existing)") : i18n.tr("Password (optional)")
                     onTextChanged: root.editPassword = text
                 }
 
                 TextField {
+                    height: 48
                     width: parent.width
                     text: root.editDisplayName
                     placeholderText: i18n.tr("Friendly Label (optional, e.g. Work Domain Admin)")
@@ -117,22 +142,33 @@ Flickable {
                     spacing: units.gu(1)
                     Button {
                         text: i18n.tr("Save Account")
+                        enabled: !root.saveBusy
+                        height: 48
                         color: "#0078D4"
                         onClicked: {
-                            if (root.editUsername.trim().length === 0) return
+                            if (root.saveBusy)
+                                return;
+                            if (root.editUsername.trim().length === 0) {
+                                root.validationError = i18n.tr("Enter a username.");
+                                return;
+                            }
+                            root.saveBusy = true;
+                            root.validationError = "";
                             root.saveAccount({
-                                action: "save_account",
-                                id: root.editAccountId,
-                                username: root.editUsername.trim(),
-                                domain: root.editDomain.trim(),
-                                displayName: root.editDisplayName.trim(),
-                                password: root.editPassword
-                            })
-                            root.showAccountEditor = false
+                                    "action": "save_account",
+                                    "id": root.editAccountId,
+                                    "username": root.editUsername.trim(),
+                                    "domain": root.editDomain.trim(),
+                                    "displayName": root.editDisplayName.trim(),
+                                    "password": root.editPassword
+                                });
+                            root.editPassword = "";
                         }
                     }
                     Button {
                         text: i18n.tr("Cancel")
+                        enabled: !root.saveBusy
+                        height: 48
                         color: root.darkMode ? "#263042" : "#E2E8F0"
                         onClicked: root.showAccountEditor = false
                     }
@@ -198,12 +234,14 @@ Flickable {
                         text: i18n.tr("Edit")
                         color: root.darkMode ? "#263042" : "#E2E8F0"
                         onClicked: {
-                            root.editAccountId = modelData.id
-                            root.editUsername = modelData.qualifiedUsername
-                            root.editDomain = modelData.domain
-                            root.editDisplayName = modelData.displayName
-                            root.editPassword = ""
-                            root.showAccountEditor = true
+                            root.editAccountId = modelData.id;
+                            root.editUsername = modelData.qualifiedUsername;
+                            root.editDomain = modelData.domain;
+                            root.editDisplayName = modelData.displayName;
+                            root.editPassword = "";
+                            root.validationError = "";
+                            root.saveBusy = false;
+                            root.showAccountEditor = true;
                         }
                     }
 
