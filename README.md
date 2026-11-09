@@ -83,6 +83,12 @@ The package ID remains `rdp-client-ut.zzvvmm`, and existing PCs, accounts, certi
 
 Desktop storage uses `$XDG_CONFIG_HOME/open-rdp-client`, `$XDG_DATA_HOME/open-rdp-client`, and `$XDG_CACHE_HOME/open-rdp-client`, with standard XDG defaults. Ubuntu Touch uses the corresponding `rdp-client-ut.zzvvmm` directories. The applications do not migrate or share data automatically.
 
+## CI and releases
+
+Pull requests and `main` pushes build/test Ubuntu Touch and both Linux distributions. Pushing a stable `vX.Y.Z` tag publishes the tested Ubuntu 24.04 and Debian 13 `.deb` packages to GitHub Releases after all checks pass. The tag must match the application version and have release notes in `docs/releases/X.Y.Z.md`.
+
+Desktop release filenames include the distribution to keep both downloads distinct. Releases include checksums and the source SHA. Publication uses the built-in `GITHUB_TOKEN`; Ubuntu Touch/OpenStore uploads follow the [release guide](docs/RELEASING.md).
+
 ## Tests and development
 
 ```bash

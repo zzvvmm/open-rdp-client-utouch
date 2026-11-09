@@ -69,9 +69,10 @@ architecture. Store reviewed release notes in `docs/releases/VERSION.md`.
 
 Use one clean, committed source revision for the tag and both packages. Match
 CI's successful `headSha` to that revision; a green unrelated branch/run is not
-release evidence. The current CI builds/tests on PRs and `main` pushes, without
-automated publication. Do not add tag-triggered publishing or secrets/config
-changes unless the task includes that automation.
+release evidence. CI builds/tests on PRs, `main` pushes, and stable version tags.
+On tags it automatically publishes the tested Linux `.deb` files to GitHub
+Releases. Ubuntu Touch/OpenStore uploads remain manual. Do not expand publication
+or change secrets/config unless the task includes that automation.
 
 Build amd64 then arm64 sequentially when validating release packages. Each build
 has its own Cargo target directory; the registry cache is shared.
@@ -90,9 +91,11 @@ work around a slow/repeated build.
 
 Use an available connected GitHub tool when it supports the required operations;
 otherwise use authenticated `gh` or the GitHub API. Create an annotated
-`vVERSION` tag at the tested commit, push it, and create the GitHub Release with
-both packages, checksums, source SHA, and notes. With `gh`, use `--verify-tag`
-and `--notes-file`. Verify downloaded assets against the frozen local files.
+`vVERSION` tag at the tested commit and push it. Wait for the tag workflow to
+publish the Linux `.deb` assets, then attach both frozen `.click` packages,
+checksums, and source SHA to that existing release with `gh release upload`.
+The automation uses `--verify-tag` and the reviewed notes file when creating a
+release. Verify downloaded assets against the frozen local files.
 
 For OpenStore revision uploads, prefer `clickable publish --config ubuntu-touch/clickable.yaml --arch ARCH` with
 `OPENSTORE_API_KEY` from the environment. It selects the package from the build

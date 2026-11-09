@@ -1,14 +1,37 @@
-name: Build & Test
+name: Build, Test & Release
 
 on:
   push:
     branches: ["main"]
+    tags: ["v*.*.*"]
   pull_request:
     branches: ["main"]
 
+permissions:
+  contents: read
+
 jobs:
+  release-metadata:
+    name: Validate version and release metadata
+    runs-on: ubuntu-latest
+    outputs:
+      source_sha: ${{ steps.metadata.outputs.source_sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Test release tooling
+        run: python3 -m unittest discover -s scripts/tests -v
+      - name: Validate source and tag
+        id: metadata
+        env:
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+        run: python3 scripts/linux-release.py validate --tag "$RELEASE_TAG"
+
   rust-tests:
     name: Rust tests (${{ matrix.platform }})
+    needs: release-metadata
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -21,6 +44,7 @@ jobs:
 
   click-packages:
     name: Ubuntu Touch (${{ matrix.arch }})
+    needs: release-metadata
     runs-on: ubuntu-latest
     env:
       CLICKABLE_DOCKER_COMMAND: docker
@@ -38,9 +62,11 @@ jobs:
         with:
           name: click-package-${{ matrix.arch }}
           path: build/*/app/*.click
+          if-no-files-found: error
 
   linux-packages:
     name: Linux desktop (${{ matrix.flavor }}, amd64)
+    needs: release-metadata
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -66,3 +92,37 @@ jobs:
         with:
           name: linux-${{ matrix.flavor }}-amd64
           path: build/linux-${{ matrix.flavor }}/packages/*.deb
+          if-no-files-found: error
+
+  release-linux:
+    name: Publish Linux Debian packages
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: [release-metadata, rust-tests, click-packages, linux-packages]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: linux-release-${{ github.ref_name }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: linux-*-amd64
+          path: build/linux-release-artifacts
+      - name: Stage tested packages with unique names and checksums
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          EXPECTED_SOURCE_SHA: ${{ needs.release-metadata.outputs.source_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE_SHA"
+          python3 scripts/linux-release.py stage --tag "$RELEASE_TAG" --artifacts build/linux-release-artifacts --output build/linux-release
+      - name: Publish and verify GitHub Release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_REPO: ${{ github.repository }}
+        run: python3 scripts/linux-release.py publish --tag "$RELEASE_TAG" --repo "$RELEASE_REPO" --assets build/linux-release
