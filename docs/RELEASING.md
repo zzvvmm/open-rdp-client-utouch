@@ -1,6 +1,6 @@
 # Development and release guide
 
-Linux desktop build/package instructions and acceptance checks are in [LINUX.md](LINUX.md). CI additionally builds and tests Ubuntu 24.04 and Debian 13 `.deb` artifacts. Desktop uses manual package upgrades; the OpenStore publication steps below apply to Ubuntu Touch. Run commands from the repository root.
+Linux desktop build/package instructions and acceptance checks are in [LINUX.md](LINUX.md). CI builds and tests Ubuntu 24.04 and Debian 13 `.deb` artifacts and publishes them to GitHub Releases on stable version tags. Desktop uses manual package upgrades; the OpenStore publication steps below apply to Ubuntu Touch. Run commands from the repository root.
 
 Use one version, one source commit, and the same two `.click` files for GitHub
 and OpenStore. The commands below run from the repository root. `0.1.4` is an
@@ -83,9 +83,11 @@ gh pr create --base main --fill
 
 Wait for CI and merge the PR using the repository's normal review process.
 The current [CI workflow](../.github/workflows/ci.yml) runs Rust tests, builds
-amd64 and arm64 packages, and runs QML tests on amd64. It runs on PRs and pushes
-to `main`. It does **not** publish to either service or run when a tag alone is
-pushed. CI artifacts are build outputs; they are not GitHub Release assets.
+amd64 and arm64 packages, and runs QML tests on amd64. It also builds and tests
+both Linux distributions. PRs and pushes to `main` produce CI artifacts. Pushing
+a stable `vX.Y.Z` tag runs all checks and then publishes the tested Linux `.deb`
+files to a GitHub Release. Ubuntu Touch `.click` and OpenStore publication
+continue through the manual steps below.
 
 ## 3. Prepare the release commit
 
@@ -244,17 +246,42 @@ test -z "$(git status --porcelain)"
 test "$(git rev-parse HEAD)" = "$RELEASE_SHA"
 git tag -a "$RELEASE_TAG" "$RELEASE_SHA" -m "Open RDP Client $RELEASE_TAG"
 git push origin "$RELEASE_TAG"
-
-gh release create "$RELEASE_TAG" \
-  "$RELEASE_DIR/rdp-client-ut.zzvvmm_${RELEASE_VERSION}_amd64.click" \
-  "$RELEASE_DIR/rdp-client-ut.zzvvmm_${RELEASE_VERSION}_arm64.click" \
-  "$RELEASE_DIR/SHA256SUMS" "$RELEASE_DIR/RELEASE_COMMIT" \
-  --verify-tag --title "Open RDP Client $RELEASE_TAG" \
-  --notes-file "docs/releases/$RELEASE_VERSION.md"
 ```
 
-`--verify-tag` prevents GitHub CLI from silently creating a tag at another
-commit. If the tag/release already exists, inspect it and resume missing steps;
+Wait for the tag's **Build, Test & Release** workflow to succeed. It checks that
+the tag matches the application version and `docs/releases/VERSION.md` exists,
+builds/tests all platforms, and creates or extends the GitHub Release using those
+notes. The release job uses the built-in `GITHUB_TOKEN` with `contents: write`;
+no additional publication secret is needed.
+
+The Linux release assets are:
+
+- `open-rdp-client_VERSION_ubuntu24_amd64.deb`
+- `open-rdp-client_VERSION_debian13_amd64.deb`
+- `SHA256SUMS-linux`, covering both packages and `LINUX_RELEASE_COMMIT`
+- `LINUX_RELEASE_COMMIT`, containing the tested source SHA
+
+The workflow validates package identity/version/architecture, verifies the remote
+tag still resolves to the tested SHA, and downloads the uploaded assets to check
+their bytes. Existing assets must match before any missing files are uploaded.
+Rerun a failed publication job to resume with that run's original artifacts;
+rebuilding the whole run may produce different package bytes, which are rejected
+if they conflict with existing assets. Existing release notes and draft/published
+status are preserved when attaching to a release.
+
+Once the automated Linux publication succeeds, attach the frozen Ubuntu Touch
+files to the existing release:
+
+```bash
+gh release upload "$RELEASE_TAG" \
+  "$RELEASE_DIR/rdp-client-ut.zzvvmm_${RELEASE_VERSION}_amd64.click" \
+  "$RELEASE_DIR/rdp-client-ut.zzvvmm_${RELEASE_VERSION}_arm64.click" \
+  "$RELEASE_DIR/SHA256SUMS" "$RELEASE_DIR/RELEASE_COMMIT"
+```
+
+The automation uses `--verify-tag` when creating a release, so it cannot create a
+new tag at another commit. If the tag/release already exists, inspect it and
+resume missing steps;
 do not move a published tag or overwrite a published asset casually.
 Resolve an existing tag with `git rev-parse "$RELEASE_TAG^{commit}"` and compare
 it with the validated source SHA. An existing matching lightweight tag is valid;
@@ -269,9 +296,11 @@ VERIFY_DIR="$(mktemp -d)"
 gh release download "$RELEASE_TAG" --dir "$VERIFY_DIR"
 cmp "$RELEASE_DIR/RELEASE_COMMIT" "$VERIFY_DIR/RELEASE_COMMIT"
 cmp "$RELEASE_DIR/SHA256SUMS" "$VERIFY_DIR/SHA256SUMS"
+cmp "$RELEASE_DIR/RELEASE_COMMIT" "$VERIFY_DIR/LINUX_RELEASE_COMMIT"
 (
   cd "$VERIFY_DIR"
   shasum -a 256 --check SHA256SUMS
+  shasum -a 256 --check SHA256SUMS-linux
 )
 ```
 
@@ -360,3 +389,5 @@ automatically; restart Codex if an update is not visible.
 - [Clickable publishing and automatic review](https://clickable-ut.dev/en/latest/getting-started.html).
 - [GitHub CLI release creation](https://cli.github.com/manual/gh_release_create).
 - [GitHub release management](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository).
+
+GitHub Actions references: [tag filters and token permissions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax), [release creation](https://cli.github.com/manual/gh_release_create), and [asset uploads](https://cli.github.com/manual/gh_release_upload).

@@ -50,7 +50,15 @@ Before release, record the distribution, desktop environment, display protocol, 
 7. Exchange Unicode clipboard text in both directions with another application. Verify local and remote audio modes, disabled audio, and an absent local audio device.
 8. Verify Ubuntu Touch portrait/landscape, on-screen keyboard behavior, pointer controls, saved data, and OpenStore update checks after shared changes.
 
-Publishing packages, creating release tags, and configuring an APT repository follow separate release work. Desktop currently links to releases for manual `.deb` upgrades.
+## Automated GitHub releases
+
+PRs and pushes to `main` build and test both distribution packages. Pushing a stable `vX.Y.Z` tag additionally publishes those exact tested `.deb` files after Rust, Ubuntu Touch, and Linux checks pass. Prepare matching versions with `scripts/release-version.py` and finalize `docs/releases/X.Y.Z.md` before tagging.
+
+Downloads are named `open-rdp-client_X.Y.Z_ubuntu24_amd64.deb` and `open-rdp-client_X.Y.Z_debian13_amd64.deb`. Renaming the downloads leaves the internal Debian package name/version unchanged. `SHA256SUMS-linux` and `LINUX_RELEASE_COMMIT` record the checksums and source revision.
+
+The publishing job uses the repository's built-in `GITHUB_TOKEN`. It creates a GitHub Release when needed or attaches missing assets to an existing release, preserving its notes and publication state. Identical existing assets are skipped; conflicting bytes stop publication. Uploads are downloaded again for verification. Retry only the failed publication job to reuse its original build artifacts. See [RELEASING.md](RELEASING.md) for the complete process.
+
+Desktop users continue to install `.deb` upgrades manually. OpenStore publication and APT repository hosting remain separate workflows.
 
 ## Validation recorded for this port
 
