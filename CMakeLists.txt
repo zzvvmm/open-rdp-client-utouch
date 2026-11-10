@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(open-rdp-client VERSION 0.3.0 LANGUAGES CXX)
+project(open-rdp-client VERSION 0.4.0 LANGUAGES CXX)
 
 set(OPEN_RDP_PLATFORM "linux" CACHE STRING "Frontend: linux or ubuntu-touch")
 set_property(CACHE OPEN_RDP_PLATFORM PROPERTY STRINGS linux ubuntu-touch)
